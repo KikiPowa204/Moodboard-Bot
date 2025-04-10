@@ -7,62 +7,75 @@ import logging
 import asyncio
 from urllib.parse import urlparse
 from typing import List, Optional
+import aiohttp
+import io
+import logging
+from typing import List, Dict
+from colorthief import ColorThief
 
 class ColorAnalyser:
-    """Handles color palette extraction from images"""
     def __init__(self):
         self.http = aiohttp.ClientSession()
-        self.timeout = aiohttp.ClientTimeout(total=10)
+        self.timeout = aiohttp.ClientTimeout(total=30)  # Increased timeout
+        self.logger = logging.getLogger(__name__)
 
-    async def _download_image(self, image_url: str) -> bytes:
-        """Downloads image with timeout and error handling"""
+    async def extract_palettes(self, image_url: str, color_count: int = 5) -> List[Dict]:
+        """Enhanced color extraction with better error handling"""
         try:
-            async with self.http.get(image_url, timeout=self.timeout) as response:
-                if response.status == 200:
-                    return await response.read()
-                raise ValueError(f"HTTP {response.status}")
-        except Exception as e:
-            logging.error(f"Image download failed: {str(e)}")
-            raise
+            # Validate URL first
+            if not image_url.startswith(('http://', 'https://')):
+                raise ValueError("Invalid image URL format")
 
-    async def extract_palettes(self, image_url: str, color_count: int = 3) -> List[dict]:
-        """
-        Extracts dominant colors from an image
-        Args:
-            image_url: URL of the image to analyze
-            color_count: Number of colors to extract (default: 3)
-        Returns:
-            List of color dictionaries with hex codes and dominance percentages
-            Example: [{"hex": "#4A2E19", "percentage": 45.2}, ...]
-        """
-        try:
-            # Download image
-            image_data = await self._download_image(image_url)
-            
-            # Analyze colors
-            with io.BytesIO(image_data) as buffer:
-                color_thief = ColorThief(buffer)
-                palette = color_thief.get_palette(color_count=color_count)
+            # Download with size limit (5MB)
+            async with self.http.get(image_url, timeout=self.timeout, 
+                                  max_size=5 * 1024 * 1024) as response:
+                if response.status != 200:
+                    raise ValueError(f"HTTP {response.status}")
                 
-                # Calculate relative dominance (simplified)
-                total = sum(sum(color) for color in palette)
-                return [
-                    {
-                        "hex": self._rgb_to_hex(color),
-                        "percentage": round(sum(color)/total * 100, 1) if total > 0 else 0
-                    }
-                    for color in palette
-                ]
+                image_data = await response.read()
                 
+                # Validate image
+                if len(image_data) == 0:
+                    raise ValueError("Empty image file")
+
+                # Analyze colors
+                with io.BytesIO(image_data) as buffer:
+                    try:
+                        color_thief = ColorThief(buffer)
+                        palette = color_thief.get_palette(
+                            color_count=color_count,
+                            quality=10  # Faster processing
+                        )
+                        
+                        # Normalize dominance percentages
+                        total = sum(sum(color) for color in palette) or 1  # Avoid division by zero
+                        return [
+                            {
+                                "hex": self._rgb_to_hex(color),
+                                "percentage": round(sum(color)/total * 100, 1)
+                            }
+                            for color in palette
+                        ]
+                        
+                    except Exception as e:
+                        raise ValueError(f"Color analysis failed: {str(e)}")
+
+        except aiohttp.ClientError as e:
+            self.logger.error(f"Network error: {e}")
+            raise ConnectionError("Failed to download image")
         except Exception as e:
-            logging.error(f"Color analysis failed: {str(e)}")
+            self.logger.error(f"Analysis error: {e}")
             raise
 
     @staticmethod
-    def _rgb_to_hex(rgb_tuple: tuple) -> str:
-        """Converts RGB tuple to hex string"""
-        return "#{:02x}{:02x}{:02x}".format(*rgb_tuple).upper()
+    def _rgb_to_hex(rgb: tuple) -> str:
+        """Convert RGB to hex with validation"""
+        if len(rgb) != 3 or not all(0 <= c <= 255 for c in rgb):
+            raise ValueError("Invalid RGB values")
+        return "#{:02X}{:02X}{:02X}".format(*rgb)
 
     async def close(self):
-        """Cleanup resources"""
-        await self.http.close()
+        """Proper resource cleanup"""
+        if not self.http.closed:
+            await self.http.close()
+color_analyser = ColorAnalyser
