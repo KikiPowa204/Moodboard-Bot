@@ -19,8 +19,8 @@ class MySQLStorage:
         
         try:
             parsed = urlparse(url)
-            if not all([parsed.scheme, parsed.hostname, parsed.username]):
-                raise ValueError("Invalid URL format")
+            if not url:
+                raise ValueError("MYSQL_PUBLIC_URL not found in env")
             
             return {
                 'host': parsed.hostname,
@@ -57,10 +57,9 @@ class MySQLStorage:
 
     async def _create_connection(self) -> None:
         """Create MySQL connection pool with retry logic"""
-        config = self._parse_public_url()
-        
         for attempt in range(3):  # 3 retries
             try:
+                config = self._parse_public_url()
                 if self.pool:
                     return True
                 self.logger.info(f"Connecting to MySQL (attempt {attempt+1}/{3})...")
