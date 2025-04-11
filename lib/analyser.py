@@ -74,5 +74,7 @@ class ColorAnalyser:
             await self.http.close()
             self.http = None
 
+
+
 # Remove the module-level instance - let the bot create it when needed
-# color_analyser = ColorAnalyser()  # DELETE THIS LINE
+color_analyser = ColorAnalyser()  # DELETE THIS LINE
