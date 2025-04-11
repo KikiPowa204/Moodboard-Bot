@@ -8,7 +8,7 @@ from typing import Optional
 from mysql.connector import Error    # Moody.py
 import pathlib
 from lib.database import MySQLStorage
-from lib.analyser import color_analyser
+from lib.analyser import ColorAnalyser
 # In Moody.py
 from discord.ext import commands
 import math
@@ -40,68 +40,44 @@ class MoodyBot(commands.Bot):
         self.logger = logging.getLogger(__name__)
 
     async def setup_hook(self):
-        """Initialize resources when bot starts"""
-        self.analyzer = color_analyser()
-        await self.db.initialize()
+        """Proper async initialization"""
         try:
-            if not await self.db.init_db():
-                raise RuntimeError("DB initialization failed")
-            self.logger.info("✅ Database tables verified")
-        except Exception as e:
-            self.logger.critical(f"❌ DB setup failed: {e}")
-            raise
-    async def close(self):
-        """Cleanup resources when bot stops"""
-        await self.db.close()
-        await self.analyzer.close()
-        await super().close()
-
-    async def process_submission(self, message):
-        """Enhanced submission handler with progress updates"""
-        try:
-            if not message.attachments:
-                return
-
-            # Step 1: Initial processing message
-            status_msg = await message.channel.send("🖌️ Starting artwork analysis...")
+            # Initialize database
+            self.db = MySQLStorage()
+            await self.db.initialize()
             
-            # Step 2: Get artist info
-            await status_msg.edit(content="🖌️ Verifying artist profile...")
-            artist = await self.db.get_or_create_artist(
-                discord_id=str(message.author.id),
-                name=message.author.display_name
-            )
-
-            # Step 3: Download and analyze image
-            await status_msg.edit(content="🖌️ Analyzing color palette...")
-            image_url = message.attachments[0].url
-            palette = await self.analyzer.extract_palettes(image_url)
-
-            # Step 4: Store in database
-            await status_msg.edit(content="🖌️ Saving to archive...")
-            success = await self.db.full_submission_pipeline(
-                artist_id=artist['id'],
-                image_url=image_url,
-                palette=palette,
-                metadata={
-                    'channel_id': message.channel.id,
-                    'message_id': message.id,
-                    'title': f"Artwork by {message.author.display_name}"
-                }
-            )
-
-            # Step 5: Final response
-            if success:
-                await status_msg.edit(content=f"✅ Saved! Dominant colors: {', '.join(c['hex'] for c in palette[:3])}")
-                await message.add_reaction('🎨')
-            else:
-                await status_msg.edit(content="❌ Failed to save artwork")
-
+            # Initialize analyzer
+            self.analyzer = ColorAnalyser()
+            
+            # Verify all components
+            if not all([self.db, self.analyzer]):
+                raise RuntimeError("Component initialization failed")
+                
+            self.logger.info("All components initialized successfully")
+            
         except Exception as e:
-            self.logger.error(f"Submission error: {e}", exc_info=True)
-            await message.channel.send(f"⚠️ Error: {str(e)}")
-            if 'status_msg' in locals():
-                await status_msg.delete()
+            self.logger.critical(f"Initialization failed: {e}")
+            await self.emergency_shutdown()
+            raise
+
+    async def emergency_shutdown(self):
+        """Cleanup resources if initialization fails"""
+        if self.analyzer:
+            await self.analyzer.close()
+        if self.db:
+            await self.db.close()
+
+    async def close(self):
+        """Proper shutdown sequence"""
+        try:
+            if self.analyzer:
+                await self.analyzer.close()
+            if self.db:
+                await self.db.close()
+        except Exception as e:
+            self.logger.error(f"Cleanup error: {e}")
+        finally:
+            await super().close()
 
     @commands.command()
     async def artworks(self, ctx, page: int = 1):
@@ -148,6 +124,26 @@ class MoodyBot(commands.Bot):
         if (message.attachments and 
             isinstance(message.channel, (discord.TextChannel, discord.Thread))):
             await self.process_submission(message)
+async def main():
+    try:
+        # Verify environment first
+        token = os.getenv("DISCORD_TOKEN")
+        if not token:
+            raise ValueError("DISCORD_TOKEN environment variable missing")
+        
+        bot = MoodyBot()
+        await bot.start(token)  # Better than run() for control
+        
+    except Exception as e:
+        logging.critical(f"Fatal error: {e}")
+        raise
+
 if __name__ == "__main__":
-    bot = MoodyBot()
-    bot.run(os.getenv("DISCORD_TOKEN"))  # Correct - called on instance
+    # Configure logging
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    )
+    
+    # Run with proper cleanup
+    asyncio.run(main())
