@@ -53,7 +53,11 @@ class MySQLStorage:
                 maxsize=10,
                 connect_timeout=10,
                 autocommit=False,
-                cursorclass=aiomysql.DictCursor  # Return results as dictionaries
+                cursorclass=aiomysql.DictCursor,  # Return results as dictionaries
+                use_unicode=True,
+                charset='utf8mb4',
+                # ↓ This forces PyMySQL usage ↓
+                connector=aiomysql.connectors.PyMySQLConnector
             )
             self.logger.info(f"Connected to MySQL at {config['host']}:{config['port']}")
         except Exception as e:
