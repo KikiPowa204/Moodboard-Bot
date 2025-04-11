@@ -4,7 +4,6 @@ from io import BytesIO
 import logging
 import asyncio
 from typing import Optional
-from discord.ext.commands import Bot
 import mysql.connector
 from mysql.connector import Error    # Moody.py
 import pathlib
@@ -13,12 +12,10 @@ from lib.analyser import color_analyser
 # In Moody.py
 from discord.ext import commands
 import math
-from discord.ext import commands
 import discord
 import logging
 import aiohttp
 import io
-from colorthief import ColorThief
 
 class MoodyBot(commands.Bot):
     def __init__(self, command_prefix='!'):
