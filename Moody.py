@@ -36,11 +36,12 @@ class MoodyBot(commands.Bot):
         super().__init__(command_prefix=command_prefix, intents=intents)  # Proper parent init
 
         self.db = mysql_storage()
-        self.analyzer = color_analyser()
+        self.analyzer = None
         self.logger = logging.getLogger(__name__)
 
     async def setup_hook(self):
         """Initialize resources when bot starts"""
+        self.analyzer = color_analyser()
         await self.db.initialize()
         try:
             if not await self.db.init_db():
