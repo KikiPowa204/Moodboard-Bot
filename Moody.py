@@ -29,20 +29,27 @@ logger = logging.getLogger(__name__)
 # Default settings
 
 # Runtime storage
-intents=discord.Intents.all()
-intents.message_content = True
-intents.messages = True  # Needed to read messages
 
 class MoodyBot(commands.Bot):
     def __init__(self):
+        intents = discord.Intents.all()
+        intents.message_content = True
+        super().__init__(command_prefix='!', intents=intents)  # Proper parent init
+
         self.db = mysql_storage()
         self.analyzer = color_analyser()
         self.logger = logging.getLogger(__name__)
 
     async def setup_hook(self):
         """Initialize resources when bot starts"""
-        await mysql_storage.initialize()
-
+        await self.db.initialize()
+        try:
+            if not await self.db.init_db():
+                raise RuntimeError("DB initialization failed")
+            self.logger.info("✅ Database tables verified")
+        except Exception as e:
+            self.logger.critical(f"❌ DB setup failed: {e}")
+            raise
     async def close(self):
         """Cleanup resources when bot stops"""
         await self.db.close()

@@ -3,6 +3,7 @@ import os
 import logging
 from urllib.parse import urlparse
 from typing import Optional, Dict, List, Union
+import pathlib
 from mysql.connector import connect, Error  # Import MySQL connector
 
 class MySQLStorage:
