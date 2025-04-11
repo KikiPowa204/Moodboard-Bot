@@ -34,8 +34,7 @@ intents.message_content = True
 intents.messages = True  # Needed to read messages
 
 class MoodyBot(commands.Bot):
-    def __init__(self, command_prefix='!'):
-        super().__init__(command_prefix)
+    def __init__(self):
         self.db = mysql_storage()
         self.analyzer = color_analyser()
         self.logger = logging.getLogger(__name__)
@@ -43,7 +42,6 @@ class MoodyBot(commands.Bot):
     async def setup_hook(self):
         """Initialize resources when bot starts"""
         await mysql_storage.initialize()
-        print ("Datatables ready")
 
     async def close(self):
         """Cleanup resources when bot stops"""
