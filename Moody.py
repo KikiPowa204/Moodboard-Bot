@@ -5,7 +5,6 @@ import logging
 import os
 import asyncio
 from typing import Optional
-import mysql.connector
 from mysql.connector import Error    # Moody.py
 import pathlib
 from lib.database import mysql_storage
@@ -16,7 +15,6 @@ import math
 import discord
 import logging
 import aiohttp
-import io
 
 pending_submissions = {}  # Format: {prompt_message_id: original_message_data}
 intents = discord.Intents.default()
@@ -31,6 +29,9 @@ bot = commands.Bot(command_prefix='!', intents=discord.Intents.all())
 intents=discord.Intents.all()
 intents.message_content = True
 intents.messages = True  # Needed to read messages
+
+async def run_db(self): #at startup
+    await mysql_storage.init_db
 
 class MoodyBot(commands.Bot):
     def __init__(self, command_prefix='!'):
