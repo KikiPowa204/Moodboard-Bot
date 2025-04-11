@@ -22,6 +22,9 @@ intents.message_content = True
 bot = commands.Bot(command_prefix='!', intents=discord.Intents.all())
 # Custom database module
 #Update this bitch
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Default settings
 
@@ -39,7 +42,8 @@ class MoodyBot(commands.Bot):
 
     async def setup_hook(self):
         """Initialize resources when bot starts"""
-        await self.db.initialize()
+        await mysql_storage.initialize()
+        print ("Datatables ready")
 
     async def close(self):
         """Cleanup resources when bot stops"""
