@@ -19,7 +19,6 @@ import aiohttp
 pending_submissions = {}  # Format: {prompt_message_id: original_message_data}
 intents = discord.Intents.default()
 intents.message_content = True
-bot = commands.Bot(command_prefix='!', intents=discord.Intents.all())
 # Custom database module
 #Update this bitch
 # Configure logging
@@ -31,10 +30,10 @@ logger = logging.getLogger(__name__)
 # Runtime storage
 
 class MoodyBot(commands.Bot):
-    def __init__(self):
+    def __init__(self, command_prefix='!'):
         intents = discord.Intents.all()
         intents.message_content = True
-        super().__init__(command_prefix='!', intents=intents)  # Proper parent init
+        super().__init__(command_prefix=command_prefix, intents=intents)  # Proper parent init
 
         self.db = mysql_storage()
         self.analyzer = color_analyser()
@@ -149,5 +148,5 @@ class MoodyBot(commands.Bot):
             isinstance(message.channel, (discord.TextChannel, discord.Thread))):
             await self.process_submission(message)
 if __name__ == "__main__":
-    bot.run(os.getenv("DISCORD_TOKEN"))
+    MoodyBot.run(os.getenv("DISCORD_TOKEN"))
     mysql_storage.initialize

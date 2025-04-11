@@ -73,4 +73,4 @@ class ColorAnalyser:
         """Proper resource cleanup"""
         if not self.http.closed:
             await self.http.close()
-color_analyser = ColorAnalyser
+color_analyser = ColorAnalyser()

@@ -117,7 +117,14 @@ class MySQLStorage:
             ''')
             await conn.commit()
         return True
-
+    # Add the close method to MySQLStorage class
+    async def close(self) -> None:
+        """Close all connections"""
+        if self.pool:
+            self.pool.close()
+            await self.pool.wait_closed()
+            self.logger.info("Database connections closed")
+        self.pool = None
     async def store_artist(self, discord_id: str, name: str) -> int:
         """Store a new artist and return their ID"""
         query = '''
