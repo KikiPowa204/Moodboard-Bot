@@ -10,9 +10,14 @@ from typing import List, Optional, Dict
 
 class ColorAnalyser:
     def __init__(self):
-        self.http = aiohttp.ClientSession()
+        if self.http is None:
+            self.http = aiohttp.ClientSession()
         self.timeout = aiohttp.ClientTimeout(total=30)  # Increased timeout
         self.logger = logging.getLogger(__name__)
+
+    async def ensure_session(self):
+        if self.http is None:
+            self.http = aiohttp.ClientSession()
 
     async def extract_palettes(self, image_url: str, color_count: int = 5) -> List[Dict]:
         """Enhanced color extraction with better error handling"""
