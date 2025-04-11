@@ -2,6 +2,7 @@ from colorthief import ColorThief
 import discord
 from io import BytesIO
 import logging
+import os
 import asyncio
 from typing import Optional
 import mysql.connector
@@ -140,3 +141,5 @@ class MoodyBot(commands.Bot):
         if (message.attachments and 
             isinstance(message.channel, (discord.TextChannel, discord.Thread))):
             await self.process_submission(message)
+if __name__ == "__main__":
+    bot.run(os.getenv("DISCORD_TOKEN"))
