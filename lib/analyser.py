@@ -6,12 +6,7 @@ import aiohttp
 import logging
 import asyncio
 from urllib.parse import urlparse
-from typing import List, Optional
-import aiohttp
-import io
-import logging
-from typing import List, Dict
-from colorthief import ColorThief
+from typing import List, Optional, Dict
 
 class ColorAnalyser:
     def __init__(self):
