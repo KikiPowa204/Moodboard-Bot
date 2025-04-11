@@ -40,21 +40,20 @@ class MoodyBot(commands.Bot):
         self.logger = logging.getLogger(__name__)
 
     async def setup_hook(self):
-        """Proper async initialization"""
+        """Initialize resources with proper error handling"""
         try:
-            # Initialize database
+        # Initialize database first
             self.db = MySQLStorage()
-            await self.db.initialize()
+            if not await self.db.initialize():
+                raise RuntimeError("Database initialization failed")
             
-            # Initialize analyzer
+        # Verify tables exist
+            if not await self.db.init_db():
+                raise RuntimeError("Table verification failed")
+            
+        # Then initialize analyzer
             self.analyzer = ColorAnalyser()
-            
-            # Verify all components
-            if not all([self.db, self.analyzer]):
-                raise RuntimeError("Component initialization failed")
-                
-            self.logger.info("All components initialized successfully")
-            
+        
         except Exception as e:
             self.logger.critical(f"Initialization failed: {e}")
             await self.emergency_shutdown()

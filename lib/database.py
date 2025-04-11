@@ -74,57 +74,60 @@ class MySQLStorage:
                     self.logger.error(f"Query failed: {query}", exc_info=True)
                     raise
 
-    async def init_db(self) -> None:
-        """Initialize database tables"""
+    async def init_db(self) -> bool:
+        """Initialize database tables with proper connection handling"""
         if not self.pool:
             await self._create_connection()
-        
+
         async with self.pool.acquire() as conn:
             async with conn.cursor() as cursor:
-                await cursor.execute('''
-                CREATE TABLE IF NOT EXISTS artists (
-                    id INT AUTO_INCREMENT PRIMARY KEY,
-                    discord_id VARCHAR(255) UNIQUE NOT NULL,
-                    name VARCHAR(255) NOT NULL,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-            ''')
-            await cursor.execute('''
-                CREATE TABLE IF NOT EXISTS artworks (
-                    id INT AUTO_INCREMENT PRIMARY KEY,
-                    artist_id INT NOT NULL,
-                    image_url TEXT NOT NULL,
-                    title VARCHAR(255),
-                    description TEXT,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    FOREIGN KEY (artist_id) REFERENCES artists(id),
-                    INDEX idx_artist (artist_id)
-                )
-            ''')
+                try:
+                    # Wrap table creation in a transaction
+                    await conn.begin()
+                
+                # Use IF NOT EXISTS to handle table existence gracefully
+                    await cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS artists (
+                        id INT AUTO_INCREMENT PRIMARY KEY,
+                        discord_id VARCHAR(255) UNIQUE NOT NULL,
+                        name VARCHAR(255) NOT NULL,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+                ''')
+                
+                    await cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS artworks (
+                        id INT AUTO_INCREMENT PRIMARY KEY,
+                        artist_id INT NOT NULL,
+                        image_url TEXT NOT NULL,
+                        title VARCHAR(255),
+                        description TEXT,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        FOREIGN KEY (artist_id) REFERENCES artists(id),
+                        INDEX idx_artist (artist_id)
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+                ''')
+                
+                    await conn.commit()
+                    return True
+                
+                except Exception as e:
+                    await conn.rollback()
+                    self.logger.error(f"Table creation failed: {e}")
+                    return False
 
-            await cursor.execute('''
-                CREATE TABLE IF NOT EXISTS color_palettes (
-                    id INT AUTO_INCREMENT PRIMARY KEY,
-                    artwork_id INT NOT NULL,
-                    hex_code VARCHAR(7) NOT NULL,
-                    dominance_rank TINYINT NOT NULL,
-                    coverage DECIMAL(5,2),
-                    FOREIGN KEY (artwork_id) REFERENCES artworks(id),
-                    CONSTRAINT valid_hex CHECK (hex_code REGEXP '^#[0-9A-F]{6}$'),
-                    INDEX idx_artwork (artwork_id),
-                    INDEX idx_color (hex_code)
-                )
-            ''')
-            await conn.commit()
-        return True
-    # Add the close method to MySQLStorage class
-    async def close(self) -> None:
-        """Close all connections"""
-        if self.pool:
-            self.pool.close()
-            await self.pool.wait_closed()
-            self.logger.info("Database connections closed")
-        self.pool = None
+    # In MySQLStorage class
+    async def validate_connection(self):
+        """Test if the connection works"""
+        async with self.pool.acquire() as conn:
+            async with conn.cursor() as cursor:
+                try:
+                    await cursor.execute("SELECT 1")
+                    return True
+                except Exception as e:
+                    self.logger.error(f"Connection test failed: {e}")
+                    return False            
+
     async def store_artist(self, discord_id: str, name: str) -> int:
         """Store a new artist and return their ID"""
         query = '''
