@@ -75,16 +75,20 @@ class MySQLStorage:
 
     async def init_db(self) -> None:
         """Initialize database tables"""
-        tables = {
-            'artists': '''
+        if not self.pool:
+            await self._create_connection()
+        
+        async with self.pool.acquire() as conn:
+            async with conn.cursor() as cursor:
+                await cursor.execute('''
                 CREATE TABLE IF NOT EXISTS artists (
                     id INT AUTO_INCREMENT PRIMARY KEY,
                     discord_id VARCHAR(255) UNIQUE NOT NULL,
                     name VARCHAR(255) NOT NULL,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
-            ''',
-            'artworks': '''
+            ''')
+            await cursor.execute('''
                 CREATE TABLE IF NOT EXISTS artworks (
                     id INT AUTO_INCREMENT PRIMARY KEY,
                     artist_id INT NOT NULL,
@@ -95,8 +99,9 @@ class MySQLStorage:
                     FOREIGN KEY (artist_id) REFERENCES artists(id),
                     INDEX idx_artist (artist_id)
                 )
-            ''',
-            'color_palettes': '''
+            ''')
+
+            await cursor.execute('''
                 CREATE TABLE IF NOT EXISTS color_palettes (
                     id INT AUTO_INCREMENT PRIMARY KEY,
                     artwork_id INT NOT NULL,
@@ -108,18 +113,10 @@ class MySQLStorage:
                     INDEX idx_artwork (artwork_id),
                     INDEX idx_color (hex_code)
                 )
-            '''
-        }
+            ''')
+            await conn.commit()
+        return True
 
-        async with self.pool.acquire() as conn:
-            async with conn.cursor() as cursor:
-                for table_name, ddl in tables.items():
-                    try:
-                        await cursor.execute(ddl)
-                        self.logger.info(f"Table {table_name} initialized")
-                    except Exception as e:
-                        self.logger.error(f"Failed to create {table_name}", exc_info=True)
-                        raise
 
     async def store_artist(self, discord_id: str, name: str) -> int:
         """Store a new artist and return their ID"""
