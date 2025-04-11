@@ -3,6 +3,7 @@ import os
 import logging
 from urllib.parse import urlparse
 from typing import Optional, Dict, List, Union
+from mysql.connector import connect, Error  # Import MySQL connector
 
 class MySQLStorage:
     def __init__(self):
@@ -116,7 +117,6 @@ class MySQLStorage:
             ''')
             await conn.commit()
         return True
-
 
     async def store_artist(self, discord_id: str, name: str) -> int:
         """Store a new artist and return their ID"""

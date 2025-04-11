@@ -30,8 +30,6 @@ intents=discord.Intents.all()
 intents.message_content = True
 intents.messages = True  # Needed to read messages
 
-mysql_storage.initialize
-
 class MoodyBot(commands.Bot):
     def __init__(self, command_prefix='!'):
         super().__init__(command_prefix)
@@ -143,3 +141,4 @@ class MoodyBot(commands.Bot):
             await self.process_submission(message)
 if __name__ == "__main__":
     bot.run(os.getenv("DISCORD_TOKEN"))
+    mysql_storage.initialize
