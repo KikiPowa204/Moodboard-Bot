@@ -5,104 +5,98 @@ from urllib.parse import urlparse
 from typing import Optional, Dict, List, Union
 from mysql.connector import connect, Error  # Import MySQL connector
 import asyncio
+import os
+import aiomysql
+import logging
+import asyncio
+from urllib.parse import urlparse
+from typing import Optional, Dict, Union
 
 class MySQLStorage:
     def __init__(self):
         self.pool = None
         self.logger = logging.getLogger(__name__)
+        self.connection_timeout = 30
+        self.max_retries = 3
+        self.retry_delay = 2
 
-    def _parse_public_url(self) -> Dict[str, Union[str, int]]:
-        """Extract connection details from MYSQL_PUBLIC_URL"""
+    def _parse_db_config(self) -> Dict[str, Union[str, int]]:
+        """Parse and validate database configuration from environment"""
         url = os.getenv('MYSQL_PUBLIC_URL')
         if not url:
-            raise ValueError("MYSQL_PUBLIC_URL not found in environment variables")
-        
+            raise ValueError("MYSQL_PUBLIC_URL environment variable not set")
+
         try:
             parsed = urlparse(url)
-            if not url:
-                raise ValueError("MYSQL_PUBLIC_URL not found in env")
-            
             return {
                 'host': parsed.hostname,
                 'port': parsed.port or 3306,
                 'user': parsed.username,
                 'password': parsed.password,
-                'db': parsed.path[1:]  # Remove leading '/'
+                'db': parsed.path.lstrip('/')
             }
         except Exception as e:
-            self.logger.error(f"URL parsing failed: {e}")
-            raise ValueError(f'Invalid MYSQL_PUBLIC_URL format: {e}')
+            self.logger.error(f"Failed to parse database URL: {e}")
+            raise ValueError("Invalid database URL format") from e
 
-    async def initialize(self) -> None:
-        """Initialize connection pool with proper error handling"""
-        if self.pool is not None:
-            self.logger.warning("Connection pool already exists")
-            return
-            
-        try:
-            await self._create_connection()
-            if not await self.validate_connection():
-                raise ConnectionError("Failed to validate initial connection")
-                
-            # Initialize tables separately to avoid mixing concerns
-            if not await self.init_db():
-                self.logger.warning("Table initialization completed with warnings")
-                
-            self.logger.info("Database pool initialized successfully")
-            
-        except Exception as e:
-            self.logger.critical(f"Database initialization failed: {e}")
-            await self.close()  # Clean up if initialization fails
-            raise
-
-    async def _create_connection(self) -> None:
-        """Create MySQL connection pool with retry logic"""
-        for attempt in range(3):  # 3 retries
+    async def initialize(self) -> bool:
+        """Initialize connection pool with retry logic"""
+        for attempt in range(self.max_retries):
             try:
-                config = self._parse_public_url()
                 if self.pool:
                     return True
-                self.logger.info(f"Connecting to MySQL (attempt {attempt+1}/{3})...")
 
-                
+                config = self._parse_db_config()
+                self.logger.info(f"Connection attempt {attempt + 1}/{self.max_retries} to {config['host']}")
+
                 self.pool = await aiomysql.create_pool(
                     host=config['host'],
                     port=config['port'],
                     user=config['user'],
                     password=config['password'],
                     db=config['db'],
-                    minsize=1,  # Lower minimum for development
+                    minsize=1,
                     maxsize=5,
-                    connect_timeout=30,
+                    connect_timeout=self.connection_timeout,
                     autocommit=False,
                     cursorclass=aiomysql.DictCursor
                 )
-                self.logger.info(f"Connected to MySQL at {config['host']}:{config['port']}")
+
                 if await self._verify_connection():
-                    self.logger.info("Database connection established")
-                    return True    
+                    self.logger.info("✅ Database connection established")
+                    return True
+
+            except aiomysql.OperationalError as e:
+                self.logger.warning(f"Connection error (attempt {attempt + 1}): {e}")
+                if attempt == self.max_retries - 1:
+                    raise ConnectionError(f"Failed to connect after {self.max_retries} attempts: {e}")
+                await asyncio.sleep(self.retry_delay)
             except Exception as e:
-                if attempt == 2:  # Last attempt
-                    raise ConnectionError(f"MySQL connection failed after 3 attempts: {e}")
-                await asyncio.sleep(1)  # Wait before retrying
-                continue
+                self.logger.error(f"Unexpected error during initialization: {e}")
+                raise
 
-    async def execute_query(self, query: str, args: Optional[tuple] = None) -> aiomysql.Cursor:
-        """Execute a single query with parameters"""
-        if not self.pool:
-            raise RuntimeError("Database connection not initialized")
-            
-        async with self.pool.acquire() as conn:
-            async with conn.cursor() as cursor:
-                try:
-                    await cursor.execute(query, args or ())
-                    await conn.commit()
-                    return cursor
-                except Exception as e:
-                    await conn.rollback()
-                    self.logger.error(f"Query failed: {query[:100]}... Error: {e}")
-                    raise
+        return False
 
+    async def _verify_connection(self) -> bool:
+        """Thoroughly verify the database connection"""
+        try:
+            async with self.pool.acquire() as conn:
+                async with conn.cursor() as cursor:
+                    # Test basic query
+                    await cursor.execute("SELECT 1 AS test_value")
+                    result = await cursor.fetchone()
+                    if result['test_value'] != 1:
+                        raise ValueError("Connection test failed")
+                    
+                    # Verify database access
+                    await cursor.execute("SELECT DATABASE() AS db_name")
+                    db_info = await cursor.fetchone()
+                    self.logger.debug(f"Connected to database: {db_info['db_name']}")
+                    return True
+        except Exception as e:
+            self.logger.error(f"Connection verification failed: {e}")
+            await self.close()
+            return False
     async def init_db(self) -> bool:
         """Initialize database tables with proper error handling"""
         if not self.pool:
