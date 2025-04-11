@@ -7,7 +7,7 @@ import asyncio
 from typing import Optional
 from mysql.connector import Error    # Moody.py
 import pathlib
-from lib.database import mysql_storage
+from lib.database import MySQLStorage
 from lib.analyser import color_analyser
 # In Moody.py
 from discord.ext import commands
@@ -35,7 +35,7 @@ class MoodyBot(commands.Bot):
         intents.message_content = True
         super().__init__(command_prefix=command_prefix, intents=intents)  # Proper parent init
 
-        self.db = mysql_storage()
+        self.db = MySQLStorage()
         self.analyzer = None
         self.logger = logging.getLogger(__name__)
 

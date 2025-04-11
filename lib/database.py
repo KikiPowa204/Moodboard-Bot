@@ -195,4 +195,3 @@ class MySQLStorage:
             self.logger.error(f"Submission pipeline failed: {e}")
             return False
     
-mysql_storage= MySQLStorage()
