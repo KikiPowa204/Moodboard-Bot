@@ -149,5 +149,5 @@ class MoodyBot(commands.Bot):
             isinstance(message.channel, (discord.TextChannel, discord.Thread))):
             await self.process_submission(message)
 if __name__ == "__main__":
-    MoodyBot.run(os.getenv("DISCORD_TOKEN"))
-    mysql_storage.initialize
+    bot = MoodyBot()
+    bot.run(os.getenv("DISCORD_TOKEN"))  # Correct - called on instance
