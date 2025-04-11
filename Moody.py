@@ -17,6 +17,20 @@ import logging
 import aiohttp
 import io
 
+pending_submissions = {}  # Format: {prompt_message_id: original_message_data}
+intents = discord.Intents.default()
+intents.message_content = True
+bot = commands.Bot(command_prefix='!', intents=discord.Intents.all())
+# Custom database module
+#Update this bitch
+
+# Default settings
+
+# Runtime storage
+intents=discord.Intents.all()
+intents.message_content = True
+intents.messages = True  # Needed to read messages
+
 class MoodyBot(commands.Bot):
     def __init__(self, command_prefix='!'):
         super().__init__(command_prefix)
