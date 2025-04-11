@@ -75,7 +75,7 @@ class MySQLStorage:
                     maxsize=5,
                     connect_timeout=30,
                     autocommit=False,
-                    cursorclass=aiomysql.DictCursor,
+                    cursorclass=aiomysql.DictCursor
                 )
                 self.logger.info(f"Connected to MySQL at {config['host']}:{config['port']}")
                 if await self._verify_connection():
