@@ -19,6 +19,9 @@ class MySQLStorage:
         
         try:
             parsed = urlparse(url)
+            if not all([parsed.scheme, parsed.hostname, parsed.username]):
+                raise ValueError("Invalid URL format")
+            
             return {
                 'host': parsed.hostname,
                 'port': parsed.port or 3306,
@@ -58,21 +61,27 @@ class MySQLStorage:
         
         for attempt in range(3):  # 3 retries
             try:
+                if self.pool:
+                    return True
+                self.logger.info(f"Connecting to MySQL (attempt {attempt+1}/{3})...")
+
+                
                 self.pool = await aiomysql.create_pool(
                     host=config['host'],
                     port=config['port'],
                     user=config['user'],
                     password=config['password'],
                     db=config['db'],
-                    minsize=2,  # Lower minimum for development
-                    maxsize=10,
-                    connect_timeout=15,
+                    minsize=1,  # Lower minimum for development
+                    maxsize=5,
+                    connect_timeout=30,
                     autocommit=False,
                     cursorclass=aiomysql.DictCursor,
                 )
                 self.logger.info(f"Connected to MySQL at {config['host']}:{config['port']}")
-                return
-                
+                if await self._verify_connection():
+                    self.logger.info("Database connection established")
+                    return True    
             except Exception as e:
                 if attempt == 2:  # Last attempt
                     raise ConnectionError(f"MySQL connection failed after 3 attempts: {e}")
