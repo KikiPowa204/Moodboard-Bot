@@ -30,8 +30,7 @@ intents=discord.Intents.all()
 intents.message_content = True
 intents.messages = True  # Needed to read messages
 
-async def run_db(self): #at startup
-    await mysql_storage.init_db
+mysql_storage.initialize
 
 class MoodyBot(commands.Bot):
     def __init__(self, command_prefix='!'):
