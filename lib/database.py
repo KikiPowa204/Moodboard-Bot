@@ -8,7 +8,6 @@ import asyncio
 
 class MySQLStorage:
     def __init__(self):
-        self.pool = None
         self.logger = logging.getLogger(__name__)
 
     def _parse_public_url(self) -> Dict[str, Union[str, int]]:
