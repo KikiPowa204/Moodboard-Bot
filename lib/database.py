@@ -30,11 +30,6 @@ class MySQLStorage:
             self.logger.error(f"URL parsing failed: {e}")
             raise ValueError(f'Invalid MYSQL_PUBLIC_URL format: {e}')
 
-class MySQLStorage:
-    def __init__(self):
-        self.pool = None
-        self.logger = logging.getLogger(__name__)
-
     async def initialize(self) -> None:
         """Initialize connection pool with proper error handling"""
         if self.pool is not None:
