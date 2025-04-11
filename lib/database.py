@@ -3,7 +3,6 @@ import os
 import logging
 from urllib.parse import urlparse
 from typing import Optional, Dict, List, Union
-import pathlib
 from mysql.connector import connect, Error  # Import MySQL connector
 
 class MySQLStorage:
@@ -163,20 +162,18 @@ class MySQLStorage:
             self.pool.close()
             await self.pool.wait_closed()
             self.logger.info("Connection pool closed")
-    # Add these new methods to your MySQLStorage class
-async def get_or_create_artist(self, discord_id: str, name: str) -> dict:
-    """Get or create artist record"""
-    artist_id = await self.store_artist(discord_id, name)
-    return {'id': artist_id, 'discord_id': discord_id, 'name': name}
+    async def get_or_create_artist(self, discord_id: str, name: str) -> dict:
+        """Get or create artist record"""
+        artist_id = await self.store_artist(discord_id, name)
+        return {'id': artist_id, 'discord_id': discord_id, 'name': name}
 
-async def full_submission_pipeline(self, artist_id: int, image_url: str, 
-                                 palette: List[dict], metadata: dict) -> bool:
-    """Complete artwork storage workflow"""
-    try:
-        async with self.pool.acquire() as conn:
-            async with conn.cursor() as cursor:
-                # Store artwork
-                artwork_id = await self.store_artwork(
+    async def full_submission_pipeline(self, artist_id: int, image_url: str, palette: List[dict], metadata: dict) -> bool:
+        """Complete artwork storage workflow"""
+        try:
+            async with self.pool.acquire() as conn:
+                async with conn.cursor() as cursor:
+                    # Store artwork
+                    artwork_id = await self.store_artwork(
                     artist_id=artist_id,
                     image_url=image_url,
                     title=metadata.get('title'),
@@ -184,11 +181,11 @@ async def full_submission_pipeline(self, artist_id: int, image_url: str,
                 )
                 
                 # Store palette
-                await self.store_palette(artwork_id, palette)
+                    await self.store_palette(artwork_id, palette)
                 
-                return True
-    except Exception as e:
-        self.logger.error(f"Submission pipeline failed: {e}")
-        return False
+                    return True
+        except Exception as e:
+            self.logger.error(f"Submission pipeline failed: {e}")
+            return False
     
-mysql_storage= MySQLStorage
+mysql_storage= MySQLStorage()
