@@ -28,32 +28,36 @@ logger = logging.getLogger(__name__)
 # Default settings
 
 # Runtime storage
-
 class MoodyBot(commands.Bot):
     def __init__(self, command_prefix='!'):
         intents = discord.Intents.all()
         intents.message_content = True
-        super().__init__(command_prefix=command_prefix, intents=intents)  # Proper parent init
-
-        self.db = MySQLStorage()
+        super().__init__(command_prefix=command_prefix, intents=intents)
+        
+        # Initialize with None, will be set in setup_hook
+        self.db = None
         self.analyzer = None
         self.logger = logging.getLogger(__name__)
 
     async def setup_hook(self):
-        """Initialize resources with proper error handling"""
+        """Initialize resources with robust error handling"""
         try:
-        # Initialize database first
+            # Initialize database first
             self.db = MySQLStorage()
+            self.logger.info("Initializing database connection...")
+            
             if not await self.db.initialize():
-                raise RuntimeError("Database initialization failed")
+                raise RuntimeError("Failed to initialize database connection")
             
-        # Verify tables exist
+            # Initialize tables
+            self.logger.info("Verifying database tables...")
             if not await self.db.init_db():
-                raise RuntimeError("Table verification failed")
+                self.logger.warning("Table initialization completed with warnings")
             
-        # Then initialize analyzer
+            # Initialize analyzer
             self.analyzer = ColorAnalyser()
-        
+            self.logger.info("✅ All components initialized successfully")
+            
         except Exception as e:
             self.logger.critical(f"Initialization failed: {e}")
             await self.emergency_shutdown()
@@ -61,22 +65,13 @@ class MoodyBot(commands.Bot):
 
     async def emergency_shutdown(self):
         """Cleanup resources if initialization fails"""
-        if self.analyzer:
-            await self.analyzer.close()
-        if self.db:
-            await self.db.close()
-
-    async def close(self):
-        """Proper shutdown sequence"""
         try:
             if self.analyzer:
                 await self.analyzer.close()
             if self.db:
                 await self.db.close()
         except Exception as e:
-            self.logger.error(f"Cleanup error: {e}")
-        finally:
-            await super().close()
+            self.logger.error(f"Emergency shutdown error: {e}")
 
     @commands.command()
     async def artworks(self, ctx, page: int = 1):
