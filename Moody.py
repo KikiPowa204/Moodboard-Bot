@@ -106,13 +106,12 @@ class MoodyBot(commands.Cog):
             submitter_id=str(ctx.author.id),
             name=ctx.author.display_name
         )
-
         # 2. Then create artist with proper key names
             artist_data = {
-            'name': metadata['name'],
+            'artist_name': metadata['name'],
             'social_media_link': metadata['social'] or ""  # Map to correct key
         }
-            artist = await self.db.get_or_create_artist(**artist_data)
+            artist = await self.db.get_or_create_artist(artist_name=metadata['name'], social_media_link=metadata['social'])
 
         # 3. Then create artwork
             artwork = await self.db.create_artwork(

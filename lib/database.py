@@ -214,27 +214,27 @@ class MySQLStorage:
                 
                 return submitter
 
-    async def get_or_create_artist(self, name: str, social_media_link:str):
+    async def get_or_create_artist(self, artist_name: str, social_media_link:str):
         async with self.pool.acquire() as conn:
             async with conn.cursor() as cursor:
                 # Get existing artist
                 await cursor.execute(
-                    "SELECT * FROM artists WHERE name = %s",
-                (name,)
+                    "SELECT * FROM artists WHERE artist_name = %s",
+                (artist_name,)
             )
                 artist = await cursor.fetchone()
             
                 if not artist:
                 # Create new artist with whatever fields were provided
                     await cursor.execute(
-                    """INSERT INTO artists (name, social_media_link)
+                    """INSERT INTO artists (artist_name, social_media_link)
                     VALUES (%s, %s)""",
-                    (name, social_media_link)
+                    (artist_name, social_media_link)
                 )
                     await conn.commit()
                     return {
                     'id': cursor.lastrowid,
-                    'name': name,
+                    'name': artist_name,
                     'social_media_link': social_media_link
                 }
             
@@ -273,14 +273,14 @@ class MySQLStorage:
                 await conn.commit()
                 return artwork_id    
 
-    async def store_artist(self, discord_id: str, name: str) -> int:
+    async def store_artist(self, artist_name: str, social_media_link: str) -> int:
         """Store a new artist and return their ID"""
         query = '''
-            INSERT INTO artists (discord_id, name)
+            INSERT INTO artists (artist_name, social_media_link)
             VALUES (%s, %s)
             ON DUPLICATE KEY UPDATE name=VALUES(name)
         '''
-        cursor = await self.execute_query(query, (discord_id, name))
+        cursor = await self.execute_query(query, (artist_name, social_media_link))
         return cursor.lastrowid
 #
     async def store_artwork(self, artist_id: int, image_url: str, 
@@ -318,10 +318,6 @@ class MySQLStorage:
             await self.pool.wait_closed()
             self.pool = None
             self.logger.info("Database connections closed")
-    async def get_or_create_artist(self, discord_id: str, name: str) -> dict:
-        """Get or create artist record"""
-        artist_id = await self.store_artist(discord_id, name)
-        return {'id': artist_id, 'discord_id': discord_id, 'name': name}
 
     async def full_submission_pipeline(self, artist_id: int, image_url: str, palette: List[dict], metadata: dict) -> bool:
         """Complete artwork storage workflow"""
