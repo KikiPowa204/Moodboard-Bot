@@ -107,13 +107,13 @@ class MoodyBot(commands.Cog):
             data = {
             'discord_id': str(ctx.author.id),
             'name': metadata['name'],
-            'social_media_link': metadata['social_media_link'] or "",
+            'social_media_link': metadata['social'] or "",
             'image_url': image_url,
             'title': metadata['title'],
             'description': metadata['desc'],
             'tags': metadata['tags']
         }
-            print (metadata['social_media_link'])
+            print (metadata['social'])
         # Create artist and submitter (your existing code)
             artist = {
         'name': metadata['name'],
