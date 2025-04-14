@@ -56,13 +56,11 @@ class MoodyBot(commands.Bot):
     async def on_message(self, message):
         """Processes all messages"""
         # Essential for commands to work
-        if message.attachments and not message.author.bot:
-            await self.submit_artwork(message)
-
         await self.process_commands(message)
     
     # Your additional message processing here
-
+        if message.attachments and not message.author.bot:
+            await self.submit_artwork(message)
     async def emergency_shutdown(self):
         """Cleanup resources if initialization fails"""
         try:
