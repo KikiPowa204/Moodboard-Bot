@@ -24,20 +24,16 @@ intents.message_content = True
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
+bot = commands.Bot(command_prefix='!', intents=intents)
 # Default settings
 
 # Runtime storage
-class MoodyBot(commands.Bot):
-    def __init__(self, command_prefix='!'):
-        intents = discord.Intents.all()
-        intents.message_content = True
-        super().__init__(command_prefix=command_prefix, intents=intents)
-        
+class MoodyBot(commands.Cog):
+    def __init__(self, bot):
+        self.bot = bot
         self.db = MySQLStorage()
         self.analyzer = ColorAnalyser()
         self.logger = logging.getLogger(__name__)
-        
 
     async def setup_hook(self):
         """Initializes resources before login"""
@@ -64,7 +60,7 @@ class MoodyBot(commands.Bot):
     async def on_message(self, message):
         """Processes all messages"""
         # Process commands FIRST
-        await self.process_commands(message)
+        await self.bot.process_commands(message)
     
         # Only process images that AREN'T commands
         if (message.attachments 
@@ -181,9 +177,8 @@ async def main():
         token = os.getenv("DISCORD_TOKEN")
         if not token:
             raise ValueError("DISCORD_TOKEN environment variable missing")
-        
-        bot = MoodyBot()
-        await bot.run(token)  # Better than run() for control
+        await bot.add_cog(MoodyBot(bot))
+        await bot.start(token)
         
     except Exception as e:
         logging.critical(f"Fatal error: {e}")
