@@ -34,19 +34,16 @@ class MoodyBot(commands.Cog):
         self.db = MySQLStorage()
         self.analyzer = ColorAnalyser()
         self.logger = logging.getLogger(__name__)
+    
     @commands.Cog.listener()
-    async def setup_hook(self):
-        """Initializes resources before login"""
-        await self.db.initialize()
-        await self.db.init_db()
+    async def on_ready(self):
+        """Called when connected to Discord"""
+        await self.db.initialize
+        await self.db.init_db
         await self.bot.change_presence(activity=discord.Activity(
             type=discord.ActivityType.watching, 
             name="for art submissions"
         ))
-
-    @commands.Cog.listener()
-    async def on_ready(self):
-        """Called when connected to Discord"""
         self.logger.info(f'Logged in as {self.bot.user}')  # Fixed: self.bot.user
 
     @commands.Cog.listener()
