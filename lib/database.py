@@ -248,6 +248,17 @@ class MySQLStorage:
                     artist['social_media_link'] = social_media_link
             
                 return artist
+    async def get_artworks_by_artist(self, artist_id: int, limit: int, offset: int):
+        async with self.pool.acquire() as conn:
+            async with conn.cursor() as cursor:
+                await cursor.execute(
+                """SELECT * FROM artworks 
+                WHERE artist_id = %s 
+                ORDER BY created_at DESC
+                LIMIT %s OFFSET %s""",
+                (artist_id, limit, offset)
+            )
+                return await cursor.fetchall()
     async def create_artwork(self, submitter_id: int, artist_id: int, image_url: str, 
                              title: str, description: str, tags: List[str]):
         async with self.pool.acquire() as conn:
