@@ -15,44 +15,31 @@ class ColorAnalyser:
         """Lazy initialization of HTTP session"""
         if self.http is None or self.http.closed:
             self.http = aiohttp.ClientSession(timeout=self.timeout)
-
-    async def extract_palettes(self, image_url: str, color_count: int = 5) -> List[Dict]:
-        """Enhanced color extraction with better error handling"""
-        await self.ensure_session()  # Ensure we have a session
-        
+    async def extract_palettes(self, image_url: str):
+        await self.ensure_session()
         try:
-            # Validate URL first
-            if not image_url.startswith(('http://', 'https://')):
-                raise ValueError("Invalid image URL format")
-
-            async with self.http.get(image_url, timeout=self.timeout, 
-                                  max_size=5 * 1024 * 1024) as response:
-                if response.status != 200:
-                    raise ValueError(f"HTTP {response.status}")
-                
+            async with self.http.get(image_url, timeout=self.timeout) as response:
+                response.raise_for_status()
                 image_data = await response.read()
-                
-                if len(image_data) == 0:
-                    raise ValueError("Empty image file")
-
-                with io.BytesIO(image_data) as buffer:
-                    try:
-                        color_thief = ColorThief(buffer)
-                        palette = color_thief.get_palette(
-                            color_count=color_count,
-                            quality=10
-                        )
+            
+            # Add manual size check
+                if len(image_data) > 5 * 1024 * 1024:  # 5MB
+                    raise ValueError("Image too large")
+            
+                with BytesIO(image_data) as buffer:
+                    color_thief = ColorThief(buffer)
+                    palette = color_thief.get_palette(color_count=5, quality=10)
                         
-                        total = sum(sum(color) for color in palette) or 1
-                        return [
+                    total = sum(sum(color) for color in palette) or 1
+                    return [
                             {
                                 "hex": self._rgb_to_hex(color),
                                 "percentage": round(sum(color)/total * 100, 1)
                             }
                             for color in palette
                         ]
-                    except Exception as e:
-                        raise ValueError(f"Color analysis failed: {str(e)}")
+        except Exception as e:
+            raise ValueError(f"Color analysis failed: {str(e)}")
 
         except aiohttp.ClientError as e:
             self.logger.error(f"Network error: {e}")
