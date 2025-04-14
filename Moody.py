@@ -63,7 +63,9 @@ class MoodyBot(commands.Bot):
             raise
     
     async def on_message(self, message):
-        return await super().on_message(message)
+        if message.content.startswith('!'):
+            await super().process_commands(message)
+            return
 
     async def emergency_shutdown(self):
         """Cleanup resources if initialization fails"""
