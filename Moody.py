@@ -33,7 +33,6 @@ class MoodyBot(commands.Bot):
         intents = discord.Intents.all()
         intents.message_content = True
         super().__init__(command_prefix=command_prefix, intents=intents)
-        self.add_command(MoodyBot.submit_artwork)
         # Initialize with None, will be set in setup_hook
         self.db = None
         self.analyzer = None
