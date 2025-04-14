@@ -76,7 +76,7 @@ class MoodyBot(commands.Bot):
     
     # Your additional message processing here
         if message.attachments and not message.author.bot:
-            await self.process_image_submission(message)
+            await self.submit_artwork(message)
     async def emergency_shutdown(self):
         """Cleanup resources if initialization fails"""
         try:
