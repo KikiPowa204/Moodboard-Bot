@@ -165,7 +165,7 @@ class MoodyBot(commands.Cog):
 
         # Get or create artist
             artist = await self.db.get_or_create_artist(
-                name=artist_name,
+                artist_name=artist_name,
                 social_media_link=""  # Provide empty if not needed
             )
 
