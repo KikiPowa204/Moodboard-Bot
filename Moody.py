@@ -62,6 +62,9 @@ class MoodyBot(commands.Bot):
             self.logger.critical(f"Initialization failed: {e}")
             await self.emergency_shutdown()
             raise
+    
+    async def on_message(self, message):
+        return await super().on_message(message)
 
     async def emergency_shutdown(self):
         """Cleanup resources if initialization fails"""
