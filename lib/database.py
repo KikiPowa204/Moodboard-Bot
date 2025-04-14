@@ -127,7 +127,20 @@ class MySQLStorage:
                             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                             FOREIGN KEY (artist_id) REFERENCES artists(id),
                             INDEX idx_artist (artist_id)
-                        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4'''
+                        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4''',
+                    
+                        '''CREATE TABLE IF NOT EXISTS color_palettes (
+                            id INT AUTO_INCREMENT PRIMARY KEY,
+                            artwork_id INT NOT NULL,
+                            hex_code VARCHAR(7) NOT NULL,
+                            dominance_rank TINYINT NOT NULL,
+                            coverage DECIMAL(5,2),
+                            FOREIGN KEY (artwork_id) REFERENCES artworks(id),
+                            CONSTRAINT valid_hex CHECK (hex_code REGEXP '^#[0-9A-F]{6}$'),
+                            INDEX idx_artwork (artwork_id),
+                            INDEX idx_color (hex_code)
+                        )
+                        '''
                     ]
                     
                     for table_query in tables:
