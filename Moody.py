@@ -118,15 +118,6 @@ class MoodyBot(commands.Cog):
     }       
             
             print(artist['social_media_link'])  # Debug print
-    
-        # Create artist
-            artist = await self.db.get_or_create_artist(**artist)
-
-
-            submitter = await self.db.get_or_create_submitter(
-            discord_id=str(ctx.author.id),
-            name=ctx.author.display_name
-        )
 
         # Create artwork (fixed parameter names to match your DB schema)
             artwork = await self.db.create_artwork(
@@ -136,6 +127,14 @@ class MoodyBot(commands.Cog):
             title=data['title'],
             description=data['description'],
             tags=data['tags']
+        )
+                    # Create artist
+            artist = await self.db.get_or_create_artist(**artist)
+
+
+            submitter = await self.db.get_or_create_submitter(
+            discord_id=str(ctx.author.id),
+            name=ctx.author.display_name
         )
 
         # Extract and store color palette
