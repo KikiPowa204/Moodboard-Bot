@@ -71,7 +71,6 @@ class MoodyBot(commands.Bot):
     @commands.Cog.listener()
     async def on_message(self, message):
         """Processes every message"""
-    # Always include this line to allow commands to work:
         await self.process_commands(message)
     
     # Your additional message processing here
