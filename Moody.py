@@ -38,8 +38,8 @@ class MoodyBot(commands.Cog):
     @commands.Cog.listener()
     async def on_ready(self):
         """Called when connected to Discord"""
-        await self.db.initialize
-        await self.db.init_db
+        await self.db.initialize()
+        await self.db.init_db()
         await self.bot.change_presence(activity=discord.Activity(
             type=discord.ActivityType.watching, 
             name="for art submissions"
