@@ -169,27 +169,25 @@ class MoodyBot(commands.Bot):
             await ctx.send("⚠️ Error fetching artworks")
 
 async def main():
+    try:
+        # Verify environment first
+        token = os.getenv("DISCORD_TOKEN")
+        if not token:
+            raise ValueError("DISCORD_TOKEN environment variable missing")
+        
+        bot = MoodyBot()
+        await bot.start(token)  # Better than run() for control
+        
+    except Exception as e:
+        logging.critical(f"Fatal error: {e}")
+        raise
+
+if __name__ == "__main__":
     # Configure logging
     logging.basicConfig(
         level=logging.INFO,
         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
     )
     
-    try:
-        # Verify environment
-        token = os.getenv("DISCORD_TOKEN")
-        if not token:
-            raise ValueError("DISCORD_TOKEN environment variable missing")
-
-        # Create and run bot
-        bot = MoodyBot(command_prefix='!')
-        await bot.start(token)
-        
-    except Exception as e:
-        logging.critical(f"Fatal error: {e}")
-        raise
-    finally:
-        logging.info("Bot shutting down")
-
-if __name__ == "__main__":
+    # Run with proper cleanup
     asyncio.run(main())
