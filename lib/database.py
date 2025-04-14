@@ -214,9 +214,9 @@ class MySQLStorage:
                 return submitter
 
     async def get_or_create_artist(self, name: str, social_media: str = ""):
+        """Get or create artist with optional social media link"""
         async with self.pool.acquire() as conn:
             async with conn.cursor() as cursor:
-                # Try to get existing artist
                 await cursor.execute(
                     "SELECT * FROM artists WHERE name = %s",
                     (name,)
@@ -224,21 +224,22 @@ class MySQLStorage:
                 artist = await cursor.fetchone()
                 
                 if not artist:
-                    # Create new artist
                     await cursor.execute(
-                        """INSERT INTO artists 
-                        (name, social_media_link) 
+                        """INSERT INTO artists (name, social_media_link)
                         VALUES (%s, %s)""",
                         (name, social_media)
                     )
                     await conn.commit()
-                    return {'id': cursor.lastrowid, 'name': name, 'social_media_link': social_media}
+                    return {
+                        'id': cursor.lastrowid,
+                        'name': name,
+                        'social_media_link': social_media
+                    }
                 
-                # Update social media if provided and different
-                if social_media and artist['social_media_link'] != social_media:
+                # Update if social media changed
+                if social_media and artist.get('social_media_link') != social_media:
                     await cursor.execute(
-                        """UPDATE artists 
-                        SET social_media_link = %s 
+                        """UPDATE artists SET social_media_link = %s
                         WHERE id = %s""",
                         (social_media, artist['id'])
                     )
@@ -246,7 +247,6 @@ class MySQLStorage:
                     artist['social_media_link'] = social_media
                 
                 return artist
-
     async def create_artwork(self, submitter_id: int, artist_id: int, image_url: str, 
                              title: str, description: str, tags: List[str]):
         async with self.pool.acquire() as conn:
