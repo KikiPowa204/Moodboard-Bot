@@ -214,41 +214,49 @@ class MySQLStorage:
                 
                 return submitter
 
-    async def get_or_create_artist(self, name: str, social_media: str = ""):
-        print("✅ Running updated get_or_create_artist with social_media_link")
-
-        """Get or create artist with optional social media link"""
+    async def get_or_create_artist(self, name: str, **kwargs):
+        """Get or create artist with optional parameters.
+    
+    Args:
+        name: Artist name (required)
+        **kwargs: Optional fields including:
+            - social_media: Social media URL
+            - Any other future artist attributes
+        """
+        social_media = kwargs.get('social_media', "")
+    
         async with self.pool.acquire() as conn:
             async with conn.cursor() as cursor:
+                # Get existing artist
                 await cursor.execute(
                     "SELECT * FROM artists WHERE name = %s",
-                    (name,)
-                )
+                (name,)
+            )
                 artist = await cursor.fetchone()
-                
+            
                 if not artist:
+                # Create new artist with whatever fields were provided
                     await cursor.execute(
-                        """INSERT INTO artists (name, social_media_link)
-                        VALUES (%s, %s)""",
-                        (name, social_media)
-                    )
+                    """INSERT INTO artists (name, social_media_link)
+                    VALUES (%s, %s)""",
+                    (name, social_media)
+                )
                     await conn.commit()
                     return {
-                        'id': cursor.lastrowid,
-                        'name': name,
-                        'social_media_link': social_media
-                    }
-                
-                # Update if social media changed
+                    'id': cursor.lastrowid,
+                    'name': name,
+                    'social_media_link': social_media
+                }
+            
+            # Update social media if provided and different
                 if social_media and artist.get('social_media_link') != social_media:
                     await cursor.execute(
-                        """UPDATE artists SET social_media_link = %s
-                        WHERE id = %s""",
-                        (social_media, artist['id'])
-                    )
+                    "UPDATE artists SET social_media_link = %s WHERE id = %s",
+                    (social_media, artist['id'])
+                )
                     await conn.commit()
                     artist['social_media_link'] = social_media
-                
+            
                 return artist
     async def create_artwork(self, submitter_id: int, artist_id: int, image_url: str, 
                              title: str, description: str, tags: List[str]):

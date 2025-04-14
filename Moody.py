@@ -93,13 +93,15 @@ class MoodyBot(commands.Cog):
 
             image_url = ctx.message.attachments[0].url
             
-            submitter = await self.db.get_or_create_submitter(
-                discord_id=str(ctx.author.id),
-                name=ctx.author.display_name
-        )
             artist = await self.db.get_or_create_artist(
                 name=data['name'],
                 social_media=data['social']  # ✅ MATCHES function param
+        )
+
+
+            submitter = await self.db.get_or_create_submitter(
+                discord_id=str(ctx.author.id),
+                name=ctx.author.display_name
         )
 
             artwork_id = await self.db.create_artwork(
