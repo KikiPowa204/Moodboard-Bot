@@ -68,66 +68,75 @@ class MoodyBot(commands.Cog):
                 await self.db.close()
         except Exception as e:
             self.logger.error(f"Emergency shutdown error: {e}")
-    @commands.command(name='submit')
-    async def submit_artwork(self, ctx, *, args: str):
-        """Submit artwork using: !submit Artist, [social], [title], [desc], [tags]"""
-        if not ctx.message.attachments:
-            await ctx.send("❌ Please attach an image file!")
-            return
+@commands.command(name='submit')
+async def submit_artwork(self, ctx, *, args: str):
+    """Submit artwork using: !submit Artist, [social], [title], [desc], [tags]"""
+    if not ctx.message.attachments:
+        await ctx.send("❌ Please attach an image file!")
+        return
 
-        try:
-            # Parse arguments
-            parts = [p.strip() for p in args.split(',', 4)]
-            artist_name = parts[0]
-            social_media = parts[1] if len(parts) > 1 else ""
-            title = parts[2] if len(parts) > 2 else "Untitled"
-            description = parts[3] if len(parts) > 3 else ""
-            tags = [t.strip() for t in parts[4].split(',')] if len(parts) > 4 else []
+    try:
+        # Parse arguments
+        parts = [p.strip() for p in args.split(',')]
+        
+        # Handle artist_name and social_media explicitly
+        artist_name = parts[0]
+        social_media = parts[1] if len(parts) > 1 else ""
+        
+        # Join the rest for title, description, and tags
+        remaining_args = ','.join(parts[2:])
+        title_desc_tags = remaining_args.split(',', 3)
+        
+        # Parse title, description, and tags
+        title = title_desc_tags[0].strip() if len(title_desc_tags) > 0 else "Untitled"
+        description = title_desc_tags[1].strip() if len(title_desc_tags) > 1 else ""
+        tags = [t.strip() for t in title_desc_tags[2].split(',')] if len(title_desc_tags) > 2 else []
 
-            # Process image
-            image_url = ctx.message.attachments[0].url
-            
-            # Get/create records
-            artist = await self.db.get_or_create_artist(
-                name=artist_name,
-                social_media=social_media
-            )
-            
-            submitter = await self.db.get_or_create_submitter(
-                discord_id=str(ctx.author.id),
-                name=ctx.author.display_name
-            )
-            
-            # Store artwork
-            artwork_id = await self.db.create_artwork(
-                submitter_id=submitter['id'],
-                artist_id=artist['id'],
-                image_url=image_url,
-                title=title,
-                description=description,
-                tags=tags
-            )
-            
-            # Process colors
-            async with aiohttp.ClientSession() as session:
-                async with session.get(image_url) as resp:
-                    if resp.status == 200:
-                        data = await resp.read()
-                        with io.BytesIO(data) as img_data:
-                            palette = await self.analyzer.extract_palettes(img_data)
-                            for i, color in enumerate(palette[:5]):
-                                await self.db.add_color_to_palette(
-                                    artwork_id=artwork_id,
-                                    hex_code=color['hex'],
-                                    dominance_rank=i+1,
-                                    coverage=color['percentage']
-                                )
-            
-            await ctx.send(f"✅ Submitted: {title} by {artist_name} (ID: {artwork_id})")
-            
-        except Exception as e:
-            self.logger.error(f"Submission error: {e}", exc_info=True)
-            await ctx.send("⚠️ Failed to process submission. Please use format: `!submit Artist, [social], [title], [desc], [tags]`")
+        # Process image
+        image_url = ctx.message.attachments[0].url
+        
+        # Get/create records
+        artist = await self.db.get_or_create_artist(
+            name=artist_name,
+            social_media=social_media
+        )
+        
+        submitter = await self.db.get_or_create_submitter(
+            discord_id=str(ctx.author.id),
+            name=ctx.author.display_name
+        )
+        
+        # Store artwork
+        artwork_id = await self.db.create_artwork(
+            submitter_id=submitter['id'],
+            artist_id=artist['id'],
+            image_url=image_url,
+            title=title,
+            description=description,
+            tags=tags
+        )
+        
+        # Process colors
+        async with aiohttp.ClientSession() as session:
+            async with session.get(image_url) as resp:
+                if resp.status == 200:
+                    data = await resp.read()
+                    with io.BytesIO(data) as img_data:
+                        palette = await self.analyzer.extract_palettes(img_data)
+                        for i, color in enumerate(palette[:5]):
+                            await self.db.add_color_to_palette(
+                                artwork_id=artwork_id,
+                                hex_code=color['hex'],
+                                dominance_rank=i+1,
+                                coverage=color['percentage']
+                            )
+        
+        await ctx.send(f"✅ Submitted: {title} by {artist_name} (ID: {artwork_id})")
+        
+    except Exception as e:
+        self.logger.error(f"Submission error: {e}", exc_info=True)
+        await ctx.send("⚠️ Failed to process submission. Please use format: `!submit Artist, [social], [title], [desc], [tags]`")
+
     @commands.command(name='display')
     async def artworks(self, ctx, page: int = 1):
         """View your submitted artworks"""
