@@ -33,12 +33,14 @@ class MoodyBot(commands.Bot):
         intents = discord.Intents.all()
         intents.message_content = True
         super().__init__(command_prefix=command_prefix, intents=intents)
-        self.add_command(MoodyBot.submit_artwork)
-        # Initialize with None, will be set in setup_hook
-        self.db = None
-        self.analyzer = None
+        
+        # Initialize components
+        self.db = MySQLStorage()
+        self.analyzer = ColorAnalyser()
         self.logger = logging.getLogger(__name__)
-
+        
+        # Remove any existing on_message override
+        self._listeners = [l for l in self._listeners if l[0] != 'on_message']
     async def setup_hook(self):
         """Initialize resources with robust error handling"""
         try:
@@ -74,7 +76,7 @@ class MoodyBot(commands.Bot):
             self.logger.error(f"Emergency shutdown error: {e}")
     @commands.command(name='submit')
     async def submit_artwork(self, ctx, *, args: str):
-        """Submit artwork using: !submit Artist, [social], [title], [desc], [tags]"""
+        """Submit artwork with: !submit Artist, [social], [title], [desc], [tags]"""
         if not ctx.message.attachments:
             await ctx.send("❌ Please attach an image file!")
             return
@@ -113,19 +115,18 @@ class MoodyBot(commands.Bot):
             )
             
             # Process colors
-            async with aiohttp.ClientSession() as session:
-                async with session.get(image_url) as resp:
-                    if resp.status == 200:
-                        data = await resp.read()
-                        with io.BytesIO(data) as img_data:
-                            palette = await self.analyzer.extract_palettes(img_data)
-                            for i, color in enumerate(palette[:5]):
-                                await self.db.add_color_to_palette(
-                                    artwork_id=artwork_id,
-                                    hex_code=color['hex'],
-                                    dominance_rank=i+1,
-                                    coverage=color['percentage']
-                                )
+            async with self.analyzer.http.get(image_url) as response:
+                if response.status == 200:
+                    data = await response.read()
+                    with io.BytesIO(data) as img_data:
+                        palette = await self.analyzer.extract_palettes(img_data)
+                        for i, color in enumerate(palette[:5]):
+                            await self.db.add_color_to_palette(
+                                artwork_id=artwork_id,
+                                hex_code=color['hex'],
+                                dominance_rank=i+1,
+                                coverage=color['percentage']
+                            )
             
             await ctx.send(f"✅ Submitted: {title} by {artist_name} (ID: {artwork_id})")
             
@@ -168,25 +169,27 @@ class MoodyBot(commands.Bot):
             await ctx.send("⚠️ Error fetching artworks")
 
 async def main():
-    try:
-        # Verify environment first
-        token = os.getenv("DISCORD_TOKEN")
-        if not token:
-            raise ValueError("DISCORD_TOKEN environment variable missing")
-        
-        bot = MoodyBot()
-        await bot.start(token)  # Better than run() for control
-        
-    except Exception as e:
-        logging.critical(f"Fatal error: {e}")
-        raise
-
-if __name__ == "__main__":
     # Configure logging
     logging.basicConfig(
         level=logging.INFO,
         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
     )
     
-    # Run with proper cleanup
+    try:
+        # Verify environment
+        token = os.getenv("DISCORD_TOKEN")
+        if not token:
+            raise ValueError("DISCORD_TOKEN environment variable missing")
+
+        # Create and run bot
+        bot = MoodyBot(command_prefix='!')
+        await bot.start(token)
+        
+    except Exception as e:
+        logging.critical(f"Fatal error: {e}")
+        raise
+    finally:
+        logging.info("Bot shutting down")
+
+if __name__ == "__main__":
     asyncio.run(main())
