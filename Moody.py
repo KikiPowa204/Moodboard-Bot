@@ -94,7 +94,7 @@ class MoodyBot(commands.Cog):
                     if key == 'name':
                         metadata['name'] = value
                     elif key == 'social':
-                        metadata['social'] = value  # Fixed key name
+                        metadata['social_media_link'] = value  # Fixed key name
                     elif key == 'title':
                         metadata['title'] = value
                     elif key == 'desc':
@@ -107,7 +107,7 @@ class MoodyBot(commands.Cog):
             data = {
             'discord_id': str(ctx.author.id),
             'name': metadata['name'],
-            'social_media_link': metadata['social'] or "",
+            'social_media_link': metadata['social_media_link'] or "",
             'image_url': image_url,
             'title': metadata['title'],
             'description': metadata['desc'],
@@ -117,10 +117,10 @@ class MoodyBot(commands.Cog):
         # Create artist and submitter (your existing code)
             artist = {
         'name': metadata['name'],
-        'social_media': metadata['social'] or ""  # Map 'social' to 'social_media'
+        'social_media': metadata['social_media_link'] or ""  # Map 'social' to 'social_media'
     }       
             
-            print(artist['social_media'])  # Debug print
+            print(artist['social_media_link'])  # Debug print
     
         # Create artist
             artist = await self.db.get_or_create_artist(**artist)

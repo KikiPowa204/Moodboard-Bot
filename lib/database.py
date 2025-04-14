@@ -214,7 +214,7 @@ class MySQLStorage:
                 
                 return submitter
 
-    async def get_or_create_artist(self, name: str, social_media:str):
+    async def get_or_create_artist(self, name: str, social_media_link:str):
         async with self.pool.acquire() as conn:
             async with conn.cursor() as cursor:
                 # Get existing artist
@@ -229,23 +229,23 @@ class MySQLStorage:
                     await cursor.execute(
                     """INSERT INTO artists (name, social_media_link)
                     VALUES (%s, %s)""",
-                    (name, social_media)
+                    (name, social_media_link)
                 )
                     await conn.commit()
                     return {
                     'id': cursor.lastrowid,
                     'name': name,
-                    'social_media_link': social_media
+                    'social_media_link': social_media_link
                 }
             
             # Update social media if provided and different
-                if social_media and artist.get('social_media_link') != social_media:
+                if social_media_link and artist.get('social_media_link') != social_media_link:
                     await cursor.execute(
                     "UPDATE artists SET social_media_link = %s WHERE id = %s",
-                    (social_media, artist['id'])
+                    (social_media_link, artist['id'])
                 )
                     await conn.commit()
-                    artist['social_media_link'] = social_media
+                    artist['social_media_link'] = social_media_link
             
                 return artist
     async def create_artwork(self, submitter_id: int, artist_id: int, image_url: str, 
