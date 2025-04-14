@@ -61,12 +61,22 @@ class MoodyBot(commands.Bot):
             self.logger.critical(f"Initialization failed: {e}")
             await self.emergency_shutdown()
             raise
-    
+    @commands.Cog.listener()
+    async def on_ready(self):
+        """Called when the bot connects to Discord"""
+        print(f'Logged in as {self.user.name} (ID: {self.user.id})')
+        print('------')
+    # Additional startup tasks:
+        await self.change_presence(activity=discord.Activity(type=discord.ActivityType.watching, name="for art submissions"))
+    @commands.Cog.listener()
     async def on_message(self, message):
-        if message.content.startswith('!'):
-            await super().process_commands(message)
-            return
-
+        """Processes every message"""
+    # Always include this line to allow commands to work:
+        await self.process_commands(message)
+    
+    # Your additional message processing here
+        if message.attachments and not message.author.bot:
+            await self.process_image_submission(message)
     async def emergency_shutdown(self):
         """Cleanup resources if initialization fails"""
         try:
