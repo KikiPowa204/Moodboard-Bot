@@ -281,7 +281,7 @@ class MySQLStorage:
         '''
         cursor = await self.execute_query(query, (discord_id, name))
         return cursor.lastrowid
-
+#
     async def store_artwork(self, artist_id: int, image_url: str, 
                             title: Optional[str] = None, 
                             description: Optional[str] = None) -> int:
