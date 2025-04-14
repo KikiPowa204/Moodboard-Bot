@@ -74,57 +74,64 @@ class MoodyBot(commands.Bot):
             self.logger.error(f"Emergency shutdown error: {e}")
 
     @commands.command(name='submit')
-    async def submit_artwork(self, ctx, artist_name: str, social_media: str = "", title: str = "Untitled", description: str = "", *, tags: str = ""):
-        """Submit an artwork with proper artist attribution"""
+    async def submit_artwork(self, ctx, *, args: str):
+        """Submit artwork with: !submit Artist, [social], [title], [desc], [tags]"""
         if not ctx.message.attachments:
-            return await ctx.send("Please attach an image file!")
+            return await ctx.send("❌ Please attach an image file!")
         
         try:
-            # Get or create submitter
+            parts = [p.strip() for p in args.split(',', 4)]
+        
+            artist_name = parts[0]
+            social_media = parts[1] if len(parts) > 1 else ""
+            title = parts[2] if len(parts) > 2 else "Untitled"
+            description = parts[3] if len(parts) > 3 else ""
+            tags = [t.strip() for t in parts[4].split(',')] if len(parts) > 4 else []
+        
+            # Process the submission
+            image_url = ctx.message.attachments[0].url
+        
+            # Get/create artist and submitter records
+            artist = await self.db.get_or_create_artist(
+            name=artist_name,
+            social_media=social_media
+        )
+        
             submitter = await self.db.get_or_create_submitter(
             discord_id=str(ctx.author.id),
             name=ctx.author.display_name
-            )
-            
-            # Get or create artist
-            artist = await self.db.get_or_create_artist(
-            name=artist_name.strip(),
-            social_media=social_media.strip()
-            )
-            
-            # Process image
-            image_url = ctx.message.attachments[0].url
-            async with self.analyzer.http.get(image_url) as response:
-                image_data = await response.read()
-            
-            # Analyze colors
-            with io.BytesIO(image_data) as buffer:
-                palette = await self.analyzer.extract_palettes(buffer)
-            
-            # Store artwork
+        )
+        
+        # Store artwork
             artwork_id = await self.db.create_artwork(
             submitter_id=submitter['id'],
             artist_id=artist['id'],
             image_url=image_url,
             title=title,
             description=description,
-            tags=[t.strip() for t in tags.split(",") if t.strip()]
-            )
-            
-            # Store color palette
-            for i, color in enumerate(palette):
-                await self.db.add_color_to_palette(
-                    artwork_id=artwork_id,
-                    hex_code=color['hex'],
-                    dominance_rank=i+1,
-                    coverage=color['percentage']
-            )
-            
-            await ctx.send(f"✅ Artwork submitted successfully! Artist: {artist_name}")
-
+            tags=tags
+        )
+        
+        # Process colors
+            async with aiohttp.ClientSession() as session:
+                async with session.get(image_url) as resp:
+                    if resp.status == 200:
+                        data = await resp.read()
+                        with io.BytesIO(data) as img_data:
+                            palette = await self.analyzer.extract_palettes(img_data)
+                            for i, color in enumerate(palette[:5]):  # Store top 5 colors
+                                await self.db.add_color_to_palette(
+                                artwork_id=artwork_id,
+                                hex_code=color['hex'],
+                                dominance_rank=i+1,
+                                coverage=color['percentage']
+                            )
+        
+            await ctx.send(f"✅ Submitted: {title} by {artist_name} (ID: {artwork_id})")
+        
         except Exception as e:
-            self.logger.error(f"Submission failed: {e}")
-            await ctx.send("⚠️ Error processing your artwork")
+            self.logger.error(f"Submission error: {e}")
+            await ctx.send("⚠️ Failed to process submission. Please check your format and try again.")
 
     @commands.command(name='display')
     async def artworks(self, ctx, page: int = 1):
