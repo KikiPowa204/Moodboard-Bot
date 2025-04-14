@@ -70,36 +70,35 @@ class MoodyBot(commands.Cog):
             self.logger.error(f"Emergency shutdown error: {e}")
     @commands.command(name='submit')
     async def submit_artwork(self, ctx, *, args: str):
-        """Submit artwork using: !submit Artist, [social], [title], [desc], [tags]"""
+        """Submit artwork: !submit Artist, [social], [title], [desc], [tags]"""
         if not ctx.message.attachments:
             await ctx.send("❌ Please attach an image file!")
             return
 
         try:
-            # Parse arguments
             parts = [p.strip() for p in args.split(',')]
-        
-            # Handle artist_name and social_media explicitly
+
+        # First part is always artist name
             artist_name = parts[0]
+
+        # Social media is optional (second part)
             social_media = parts[1] if len(parts) > 1 else ""
         
-            # Join the rest for title, description, and tags
-            remaining_args = ','.join(parts[2:])
-            title_desc_tags = remaining_args.split(',', 3)
-        
-        # Parse title, description, and tags
-            title = title_desc_tags[0].strip() if len(title_desc_tags) > 0 else "Untitled"
-            description = title_desc_tags[1].strip() if len(title_desc_tags) > 1 else ""
-            tags = [t.strip() for t in title_desc_tags[2].split(',')] if len(title_desc_tags) > 2 else []
+        # The rest are title, description, and tags
+            remaining = parts[2:] if len(parts) > 2 else []
+            title = remaining[0] if len(remaining) > 0 else "Untitled"
+            description = remaining[1] if len(remaining) > 1 else ""
+            tags = [t.strip() for t in remaining[2].split(',')] if len(remaining) > 2 else []
 
-        # Process image
+        # Process submission
             image_url = ctx.message.attachments[0].url
         
-        # Get/create records
             artist = await self.db.get_or_create_artist(
-                    name=artist_name,
-                    social_media=social_media
+            name=artist_name,
+            social_media=social_media
         )
+        
+        # ... rest of your submission logic ...
         
             submitter = await self.db.get_or_create_submitter(
                 discord_id=str(ctx.author.id),
