@@ -168,16 +168,6 @@ class MoodyBot(commands.Bot):
             self.logger.error(f"Artworks command failed: {e}")
             await ctx.send("⚠️ Error fetching artworks")
 
-    async def on_message(self, message):
-        if message.author.bot:
-            return
-            
-        await self.process_commands(message)
-        
-        # Process image attachments in supported channels
-        if (message.attachments and 
-            isinstance(message.channel, (discord.TextChannel, discord.Thread))):
-            await self.submit_artwork(message)
 async def main():
     try:
         # Verify environment first
