@@ -191,13 +191,13 @@ class MySQLStorage:
             self.logger.error(f"Connection validation failed: {e}")
             return False
 
-    async def get_or_create_submitter(self, discord_id: str, name: str):
+    async def get_or_create_submitter(self, submitter_id: str, name: str):
         async with self.pool.acquire() as conn:
             async with conn.cursor() as cursor:
                 # Try to get existing submitter
                 await cursor.execute(
-                    "SELECT * FROM submitters WHERE discord_id = %s",
-                    (discord_id,)
+                    "SELECT * FROM submitters WHERE submitter_id = %s",
+                    (submitter_id,)
                 )
                 submitter = await cursor.fetchone()
                 
@@ -205,12 +205,12 @@ class MySQLStorage:
                     # Create new submitter
                     await cursor.execute(
                         """INSERT INTO submitters 
-                        (discord_id, name) 
+                        (submitter_id, name) 
                         VALUES (%s, %s)""",
-                        (discord_id, name)
+                        (submitter_id, name)
                     )
                     await conn.commit()
-                    return {'id': cursor.lastrowid, 'discord_id': discord_id, 'name': name}
+                    return {'id': cursor.lastrowid, 'submitter_id': submitter_id, 'name': name}
                 
                 return submitter
 
