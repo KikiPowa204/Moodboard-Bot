@@ -103,7 +103,7 @@ class MoodyBot(commands.Cog):
 
         # 1. First create submitter
             submitter = await self.db.get_or_create_submitter(
-            discord_id=str(ctx.author.id),
+            submitter_id=str(ctx.author.id),
             name=ctx.author.display_name
         )
 
