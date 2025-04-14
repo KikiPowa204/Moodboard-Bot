@@ -42,22 +42,27 @@ class MoodyBot(commands.Bot):
         """Initializes resources before login"""
         await self.db.initialize()
         await self.db.init_db()
+        await self.change_presence(activity=discord.Activity(
+            type=discord.ActivityType.watching, 
+            name="for art submissions"
+        ))
 
     @commands.Cog.listener()
     async def on_ready(self):
         """Called when connected to Discord"""
         self.logger.info(f'Logged in as {self.user}')
-        await self.change_presence(activity=discord.Game(name="Art Collector"))
 
     @commands.Cog.listener()
     async def on_message(self, message):
         """Processes all messages"""
         # Essential for commands to work
+        if message.attachments and not message.author.bot:
+            await self.submit_artwork(message)
+
         await self.process_commands(message)
     
     # Your additional message processing here
-        if message.attachments and not message.author.bot:
-            await self.submit_artwork(message)
+
     async def emergency_shutdown(self):
         """Cleanup resources if initialization fails"""
         try:
