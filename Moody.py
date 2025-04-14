@@ -34,7 +34,7 @@ class MoodyBot(commands.Cog):
         self.db = MySQLStorage()
         self.analyzer = ColorAnalyser()
         self.logger = logging.getLogger(__name__)
-
+    @commands.cog.listener()
     async def setup_hook(self):
         """Initializes resources before login"""
         await self.db.initialize()
