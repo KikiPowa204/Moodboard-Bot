@@ -110,7 +110,7 @@ class MoodyBot(commands.Cog):
             'description': metadata['desc'],
             'tags': metadata['tags']
         }
-            print (metadata['social'])
+            print (metadata['social_media_link'])
         # Create artist and submitter (your existing code)
             artist = {
         'name': metadata['name'],
