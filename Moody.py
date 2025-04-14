@@ -76,51 +76,51 @@ class MoodyBot(commands.Cog):
             return
 
         try:
-            parts = [p.strip() for p in args.split(',')]
+            lines = args.split('\n')
+            data = {'name': '', 'social': '', 'title': 'Untitled', 'desc': '', 'tags': []}
 
-        # First part is always artist name
-            artist_name = parts[0]
+            for line in lines:
+                if line.lower().startswith('name:'):
+                    data['name'] = line[5:].strip()
+                elif line.lower().startswith('social:'):
+                    data['social'] = line[7:].strip()
+                elif line.lower().startswith('title:'):
+                    data['title'] = line[6:].strip()
+                elif line.lower().startswith('desc:'):
+                    data['desc'] = line[5:].strip()
+                elif line.lower().startswith('tags:'):
+                    data['tags'] = [t.strip() for t in line[5:].split(',')]
 
-        # Social media is optional (second part)
-            social_media = parts[1] if len(parts) > 1 else ""
-        
-        # The rest are title, description, and tags
-            remaining = parts[2:] if len(parts) > 2 else []
-            title = remaining[0] if len(remaining) > 0 else "Untitled"
-            description = remaining[1] if len(remaining) > 1 else ""
-            tags = [t.strip() for t in remaining[2].split(',')] if len(remaining) > 2 else []
-
-        # Process submission
+        # Process image
             image_url = ctx.message.attachments[0].url
-        
+
+        # Get/create records
             artist = await self.db.get_or_create_artist(
-            name=artist_name,
-            social_media_link=social_media
+            name=data['name'],
+            social_media=data['social']  # Ensure parameter matches actual method
         )
-        
-        # ... rest of your submission logic ...
-        
+
             submitter = await self.db.get_or_create_submitter(
-                discord_id=str(ctx.author.id),
-                name=ctx.author.display_name
+            discord_id=str(ctx.author.id),
+            name=ctx.author.display_name
         )
-        
+
         # Store artwork
             artwork_id = await self.db.create_artwork(
             submitter_id=submitter['id'],
             artist_id=artist['id'],
             image_url=image_url,
-            title=title,
-            description=description,
-            tags=tags
+            title=data['title'],
+            description=data['desc'],
+            tags=data['tags']
         )
-        
-        # Process colors
+
+        # Analyze and store palette (same as before)
             async with aiohttp.ClientSession() as session:
                 async with session.get(image_url) as resp:
                     if resp.status == 200:
-                        data = await resp.read()
-                        with io.BytesIO(data) as img_data:
+                        data_img = await resp.read()
+                        with io.BytesIO(data_img) as img_data:
                             palette = await self.analyzer.extract_palettes(img_data)
                             for i, color in enumerate(palette[:5]):
                                 await self.db.add_color_to_palette(
@@ -129,12 +129,12 @@ class MoodyBot(commands.Cog):
                                 dominance_rank=i+1,
                                 coverage=color['percentage']
                             )
-        
-            await ctx.send(f"✅ Submitted: {title} by {artist_name} (ID: {artwork_id})")
-        
+
+            await ctx.send(f"✅ Submitted: {data['title']} by {data['name']} (ID: {artwork_id})")
+
         except Exception as e:
             self.logger.error(f"Submission error: {e}", exc_info=True)
-            await ctx.send("⚠️ Failed to process submission. Please use format: `!submit Artist, [social], [title], [desc], [tags]`")
+            await ctx.send("⚠️ Submission failed. Please use the correct format.")
 
     @commands.command(name='display')
     async def artworks(self, ctx, page: int = 1):

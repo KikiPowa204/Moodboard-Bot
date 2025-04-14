@@ -11,6 +11,7 @@ import logging
 import asyncio
 from urllib.parse import urlparse
 from typing import Optional, Dict, Union
+
 class MySQLStorage:
     def __init__(self):
         self.pool = None
@@ -214,6 +215,8 @@ class MySQLStorage:
                 return submitter
 
     async def get_or_create_artist(self, name: str,*, social_media: str = ""):
+        print("✅ Running updated get_or_create_artist with social_media_link")
+
         """Get or create artist with optional social media link"""
         async with self.pool.acquire() as conn:
             async with conn.cursor() as cursor:
