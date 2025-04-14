@@ -76,7 +76,7 @@ class MoodyBot(commands.Bot):
             self.logger.error(f"Emergency shutdown error: {e}")
     @commands.command(name='submit')
     async def submit_artwork(self, ctx, *, args: str):
-        """Submit artwork with: !submit Artist, [social], [title], [desc], [tags]"""
+        """Submit artwork using: !submit Artist, [social], [title], [desc], [tags]"""
         if not ctx.message.attachments:
             await ctx.send("❌ Please attach an image file!")
             return
@@ -115,18 +115,19 @@ class MoodyBot(commands.Bot):
             )
             
             # Process colors
-            async with self.analyzer.http.get(image_url) as response:
-                if response.status == 200:
-                    data = await response.read()
-                    with io.BytesIO(data) as img_data:
-                        palette = await self.analyzer.extract_palettes(img_data)
-                        for i, color in enumerate(palette[:5]):
-                            await self.db.add_color_to_palette(
-                                artwork_id=artwork_id,
-                                hex_code=color['hex'],
-                                dominance_rank=i+1,
-                                coverage=color['percentage']
-                            )
+            async with aiohttp.ClientSession() as session:
+                async with session.get(image_url) as resp:
+                    if resp.status == 200:
+                        data = await resp.read()
+                        with io.BytesIO(data) as img_data:
+                            palette = await self.analyzer.extract_palettes(img_data)
+                            for i, color in enumerate(palette[:5]):
+                                await self.db.add_color_to_palette(
+                                    artwork_id=artwork_id,
+                                    hex_code=color['hex'],
+                                    dominance_rank=i+1,
+                                    coverage=color['percentage']
+                                )
             
             await ctx.send(f"✅ Submitted: {title} by {artist_name} (ID: {artwork_id})")
             
