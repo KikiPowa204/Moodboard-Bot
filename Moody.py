@@ -72,67 +72,66 @@ class MoodyBot(commands.Bot):
                 await self.db.close()
         except Exception as e:
             self.logger.error(f"Emergency shutdown error: {e}")
-
     @commands.command(name='submit')
     async def submit_artwork(self, ctx, *, args: str):
-        """Submit artwork with: !submit Artist, [social], [title], [desc], [tags]"""
+        """Submit artwork using: !submit Artist, [social], [title], [desc], [tags]"""
         if not ctx.message.attachments:
-            return await ctx.send("❌ Please attach an image file!")
-        
+            await ctx.send("❌ Please attach an image file!")
+            return
+
         try:
+            # Parse arguments
             parts = [p.strip() for p in args.split(',', 4)]
-        
             artist_name = parts[0]
             social_media = parts[1] if len(parts) > 1 else ""
             title = parts[2] if len(parts) > 2 else "Untitled"
             description = parts[3] if len(parts) > 3 else ""
             tags = [t.strip() for t in parts[4].split(',')] if len(parts) > 4 else []
-        
-            # Process the submission
+
+            # Process image
             image_url = ctx.message.attachments[0].url
-        
-            # Get/create artist and submitter records
+            
+            # Get/create records
             artist = await self.db.get_or_create_artist(
-            name=artist_name,
-            social_media=social_media
-        )
-        
+                name=artist_name,
+                social_media=social_media
+            )
+            
             submitter = await self.db.get_or_create_submitter(
-            discord_id=str(ctx.author.id),
-            name=ctx.author.display_name
-        )
-        
-        # Store artwork
+                discord_id=str(ctx.author.id),
+                name=ctx.author.display_name
+            )
+            
+            # Store artwork
             artwork_id = await self.db.create_artwork(
-            submitter_id=submitter['id'],
-            artist_id=artist['id'],
-            image_url=image_url,
-            title=title,
-            description=description,
-            tags=tags
-        )
-        
-        # Process colors
+                submitter_id=submitter['id'],
+                artist_id=artist['id'],
+                image_url=image_url,
+                title=title,
+                description=description,
+                tags=tags
+            )
+            
+            # Process colors
             async with aiohttp.ClientSession() as session:
                 async with session.get(image_url) as resp:
                     if resp.status == 200:
                         data = await resp.read()
                         with io.BytesIO(data) as img_data:
                             palette = await self.analyzer.extract_palettes(img_data)
-                            for i, color in enumerate(palette[:5]):  # Store top 5 colors
+                            for i, color in enumerate(palette[:5]):
                                 await self.db.add_color_to_palette(
-                                artwork_id=artwork_id,
-                                hex_code=color['hex'],
-                                dominance_rank=i+1,
-                                coverage=color['percentage']
-                            )
-        
+                                    artwork_id=artwork_id,
+                                    hex_code=color['hex'],
+                                    dominance_rank=i+1,
+                                    coverage=color['percentage']
+                                )
+            
             await ctx.send(f"✅ Submitted: {title} by {artist_name} (ID: {artwork_id})")
-        
+            
         except Exception as e:
-            self.logger.error(f"Submission error: {e}")
-            await ctx.send("⚠️ Failed to process submission. Please check your format and try again.")
-
+            self.logger.error(f"Submission error: {e}", exc_info=True)
+            await ctx.send("⚠️ Failed to process submission. Please use format: `!submit Artist, [social], [title], [desc], [tags]`")
     @commands.command(name='display')
     async def artworks(self, ctx, page: int = 1):
         """View your submitted artworks"""
