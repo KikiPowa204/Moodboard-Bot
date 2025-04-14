@@ -116,9 +116,7 @@ class MoodyBot(commands.Cog):
             print (metadata['social_media_link'])
         # Create artist and submitter (your existing code)
             artist = await self.db.get_or_create_artist(
-            name=data['name'],
-            social_media=data['social_media_link']
-        )
+            **data)
 
             submitter = await self.db.get_or_create_submitter(
             discord_id=str(ctx.author.id),

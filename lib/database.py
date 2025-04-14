@@ -223,7 +223,7 @@ class MySQLStorage:
             - social_media: Social media URL
             - Any other future artist attributes
         """
-        social_media = kwargs.get('social_media', "")
+        social_media = kwargs.get('social_media_link', "")
     
         async with self.pool.acquire() as conn:
             async with conn.cursor() as cursor:
