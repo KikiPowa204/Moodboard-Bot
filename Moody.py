@@ -1,6 +1,6 @@
 from colorthief import ColorThief
 import discord
-from io import BytesIO
+import io
 import logging
 import os
 import asyncio
@@ -73,7 +73,60 @@ class MoodyBot(commands.Bot):
         except Exception as e:
             self.logger.error(f"Emergency shutdown error: {e}")
 
-    @commands.command()
+    @commands.command(name='submit')
+    async def submit_artwork(self, ctx, artist_name: str, social_media: str = "", title: str = "Untitled", description: str = "", *, tags: str = ""):
+        """Submit an artwork with proper artist attribution"""
+        if not ctx.message.attachments:
+            return await ctx.send("Please attach an image file!")
+        
+        try:
+            # Get or create submitter
+            submitter = await self.db.get_or_create_submitter(
+            discord_id=str(ctx.author.id),
+            name=ctx.author.display_name
+            )
+            
+            # Get or create artist
+            artist = await self.db.get_or_create_artist(
+            name=artist_name.strip(),
+            social_media=social_media.strip()
+            )
+            
+            # Process image
+            image_url = ctx.message.attachments[0].url
+            async with self.analyzer.http.get(image_url) as response:
+                image_data = await response.read()
+            
+            # Analyze colors
+            with io.BytesIO(image_data) as buffer:
+                palette = await self.analyzer.extract_palettes(buffer)
+            
+            # Store artwork
+            artwork_id = await self.db.create_artwork(
+            submitter_id=submitter['id'],
+            artist_id=artist['id'],
+            image_url=image_url,
+            title=title,
+            description=description,
+            tags=[t.strip() for t in tags.split(",") if t.strip()]
+            )
+            
+            # Store color palette
+            for i, color in enumerate(palette):
+                await self.db.add_color_to_palette(
+                    artwork_id=artwork_id,
+                    hex_code=color['hex'],
+                    dominance_rank=i+1,
+                    coverage=color['percentage']
+            )
+            
+            await ctx.send(f"✅ Artwork submitted successfully! Artist: {artist_name}")
+
+        except Exception as e:
+            self.logger.error(f"Submission failed: {e}")
+            await ctx.send("⚠️ Error processing your artwork")
+
+    @commands.command(name='display')
     async def artworks(self, ctx, page: int = 1):
         """View your submitted artworks"""
         try:

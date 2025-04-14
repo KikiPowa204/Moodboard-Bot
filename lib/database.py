@@ -11,7 +11,6 @@ import logging
 import asyncio
 from urllib.parse import urlparse
 from typing import Optional, Dict, Union
-
 class MySQLStorage:
     def __init__(self):
         self.pool = None
@@ -97,36 +96,47 @@ class MySQLStorage:
             self.logger.error(f"Connection verification failed: {e}")
             await self.close()
             return False
+
     async def init_db(self) -> bool:
-        """Initialize database tables with proper error handling"""
+        """Initialize database tables with proper relationships"""
         if not self.pool:
             await self._create_connection()
 
         async with self.pool.acquire() as conn:
             async with conn.cursor() as cursor:
                 try:
-                    # Suppress "table exists" warnings
                     await cursor.execute("SET sql_notes = 0;")
                     await conn.begin()
                     
                     # Table creation queries
                     tables = [
-                        '''CREATE TABLE IF NOT EXISTS artists (
+                        '''CREATE TABLE IF NOT EXISTS submitters (
                             id INT AUTO_INCREMENT PRIMARY KEY,
                             discord_id VARCHAR(255) UNIQUE NOT NULL,
                             name VARCHAR(255) NOT NULL,
                             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4''',
                         
+                        '''CREATE TABLE IF NOT EXISTS artists (
+                            id INT AUTO_INCREMENT PRIMARY KEY,
+                            name VARCHAR(255) NOT NULL,
+                            social_media_link TEXT,
+                            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                            INDEX idx_artist_name (name)
+                        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4''',
+                        
                         '''CREATE TABLE IF NOT EXISTS artworks (
                             id INT AUTO_INCREMENT PRIMARY KEY,
+                            submitter_id INT NOT NULL,
                             artist_id INT NOT NULL,
                             image_url TEXT NOT NULL,
                             title VARCHAR(255),
                             description TEXT,
                             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                            FOREIGN KEY (submitter_id) REFERENCES submitters(id),
                             FOREIGN KEY (artist_id) REFERENCES artists(id),
-                            INDEX idx_artist (artist_id)
+                            INDEX idx_artist (artist_id),
+                            INDEX idx_submitter (submitter_id)
                         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4''',
                     
                         '''CREATE TABLE IF NOT EXISTS color_palettes (
@@ -139,8 +149,16 @@ class MySQLStorage:
                             CONSTRAINT valid_hex CHECK (hex_code REGEXP '^#[0-9A-F]{6}$'),
                             INDEX idx_artwork (artwork_id),
                             INDEX idx_color (hex_code)
-                        )
-                        '''
+                        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4''',
+                        
+                        '''CREATE TABLE IF NOT EXISTS artwork_tags (
+                            id INT AUTO_INCREMENT PRIMARY KEY,
+                            artwork_id INT NOT NULL,
+                            tag VARCHAR(50) NOT NULL,
+                            FOREIGN KEY (artwork_id) REFERENCES artworks(id),
+                            INDEX idx_tag (tag),
+                            UNIQUE KEY unique_artwork_tag (artwork_id, tag)
+                        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4'''
                     ]
                     
                     for table_query in tables:
@@ -155,7 +173,7 @@ class MySQLStorage:
                     self.logger.error(f"Table creation failed: {e}")
                     return False
                 finally:
-                    await cursor.execute("SET sql_notes = 1;")  # Ensure this is always reset
+                    await cursor.execute("SET sql_notes = 1;")
 
     async def validate_connection(self) -> bool:
         """Test if the connection works"""
@@ -171,6 +189,89 @@ class MySQLStorage:
         except Exception as e:
             self.logger.error(f"Connection validation failed: {e}")
             return False
+
+    async def get_or_create_submitter(self, discord_id: str, name: str):
+        async with self.pool.acquire() as conn:
+            async with conn.cursor() as cursor:
+                # Try to get existing submitter
+                await cursor.execute(
+                    "SELECT * FROM submitters WHERE discord_id = %s",
+                    (discord_id,)
+                )
+                submitter = await cursor.fetchone()
+                
+                if not submitter:
+                    # Create new submitter
+                    await cursor.execute(
+                        """INSERT INTO submitters 
+                        (discord_id, name) 
+                        VALUES (%s, %s)""",
+                        (discord_id, name)
+                    )
+                    await conn.commit()
+                    return {'id': cursor.lastrowid, 'discord_id': discord_id, 'name': name}
+                
+                return submitter
+
+    async def get_or_create_artist(self, name: str, social_media: str = ""):
+        async with self.pool.acquire() as conn:
+            async with conn.cursor() as cursor:
+                # Try to get existing artist
+                await cursor.execute(
+                    "SELECT * FROM artists WHERE name = %s",
+                    (name,)
+                )
+                artist = await cursor.fetchone()
+                
+                if not artist:
+                    # Create new artist
+                    await cursor.execute(
+                        """INSERT INTO artists 
+                        (name, social_media_link) 
+                        VALUES (%s, %s)""",
+                        (name, social_media)
+                    )
+                    await conn.commit()
+                    return {'id': cursor.lastrowid, 'name': name, 'social_media_link': social_media}
+                
+                # Update social media if provided and different
+                if social_media and artist['social_media_link'] != social_media:
+                    await cursor.execute(
+                        """UPDATE artists 
+                        SET social_media_link = %s 
+                        WHERE id = %s""",
+                        (social_media, artist['id'])
+                    )
+                    await conn.commit()
+                    artist['social_media_link'] = social_media
+                
+                return artist
+
+    async def create_artwork(self, submitter_id: int, artist_id: int, image_url: str, 
+                             title: str, description: str, tags: List[str]):
+        async with self.pool.acquire() as conn:
+            async with conn.cursor() as cursor:
+                await cursor.execute(
+                    """INSERT INTO artworks 
+                    (submitter_id, artist_id, image_url, title, description) 
+                    VALUES (%s, %s, %s, %s, %s)""",
+                    (submitter_id, artist_id, image_url, title, description)
+                )
+                artwork_id = cursor.lastrowid
+                
+                # Store tags
+                for tag in tags:
+                    await cursor.execute(
+                        """INSERT INTO artwork_tags 
+                        (artwork_id, tag) 
+                        VALUES (%s, %s)
+                        ON DUPLICATE KEY UPDATE tag=tag""",
+                        (artwork_id, tag.lower())
+                    )
+                
+                await conn.commit()
+                return artwork_id    
+
     async def store_artist(self, discord_id: str, name: str) -> int:
         """Store a new artist and return their ID"""
         query = '''
@@ -182,8 +283,8 @@ class MySQLStorage:
         return cursor.lastrowid
 
     async def store_artwork(self, artist_id: int, image_url: str, 
-                          title: Optional[str] = None, 
-                          description: Optional[str] = None) -> int:
+                            title: Optional[str] = None, 
+                            description: Optional[str] = None) -> int:
         """Store artwork and return its ID"""
         query = '''
             INSERT INTO artworks (artist_id, image_url, title, description)
