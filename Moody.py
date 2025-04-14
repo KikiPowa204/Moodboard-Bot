@@ -37,20 +37,28 @@ class MoodyBot(commands.Bot):
         self.db = MySQLStorage()
         self.analyzer = ColorAnalyser()
         self.logger = logging.getLogger(__name__)
+        
 
     async def setup_hook(self):
         """Initializes resources before login"""
         await self.db.initialize()
         await self.db.init_db()
-        await self.change_presence(activity=discord.Activity(
-            type=discord.ActivityType.watching, 
-            name="for art submissions"
-        ))
 
     @commands.Cog.listener()
     async def on_ready(self):
         """Called when connected to Discord"""
         self.logger.info(f'Logged in as {self.user}')
+        await self.change_presence(activity=discord.Activity(
+            type=discord.ActivityType.watching, 
+            name="for art submissions"
+        ))
+    async def _process_non_command_image(self, message):
+        """Handles images not attached to commands"""
+        try:
+            self.logger.info(f"Processing non-command image from {message.author}")
+        # Your image processing logic here
+        except Exception as e:
+            self.logger.error(f"Non-command image failed: {e}")
 
     @commands.Cog.listener()
     async def on_message(self, message):
