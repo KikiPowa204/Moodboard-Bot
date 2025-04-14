@@ -170,7 +170,7 @@ class MoodyBot(commands.Bot):
         # Process image attachments in supported channels
         if (message.attachments and 
             isinstance(message.channel, (discord.TextChannel, discord.Thread))):
-            await self.process_submission(message)
+            await self.submit_artwork(message)
 async def main():
     try:
         # Verify environment first
