@@ -54,17 +54,6 @@ class MoodyBot(commands.Bot):
         """Processes all messages"""
         # Essential for commands to work
         await self.process_commands(message)
-        
-        # Your custom message processing
-        if message.attachments and not message.author.bot:
-            await self.process_image(message)
-
-    # Additional startup tasks:
-        await self.change_presence(activity=discord.Activity(type=discord.ActivityType.watching, name="for art submissions"))
-    @commands.Cog.listener()
-    async def on_message(self, message):
-        """Processes every message"""
-        await self.process_commands(message)
     
     # Your additional message processing here
         if message.attachments and not message.author.bot:
