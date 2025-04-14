@@ -55,12 +55,14 @@ class MoodyBot(commands.Bot):
     @commands.Cog.listener()
     async def on_message(self, message):
         """Processes all messages"""
-        # Essential for commands to work
+        # Process commands FIRST
         await self.process_commands(message)
     
-    # Your additional message processing here
-        if message.attachments and not message.author.bot:
-            await self.submit_artwork(message)
+        # Only process images that AREN'T commands
+        if (message.attachments 
+            and not message.author.bot
+            and not message.content.startswith(self.command_prefix)):
+            await self._process_non_command_image(message)
     async def emergency_shutdown(self):
         """Cleanup resources if initialization fails"""
         try:
