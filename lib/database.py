@@ -214,17 +214,7 @@ class MySQLStorage:
                 
                 return submitter
 
-    async def get_or_create_artist(self, name: str, **kwargs):
-        """Get or create artist with optional parameters.
-    
-    Args:
-        name: Artist name (required)
-        **kwargs: Optional fields including:
-            - social_media: Social media URL
-            - Any other future artist attributes
-        """
-        social_media = kwargs.get('social_media_link', "")
-    
+    async def get_or_create_artist(self, name: str, social_media:str):
         async with self.pool.acquire() as conn:
             async with conn.cursor() as cursor:
                 # Get existing artist
