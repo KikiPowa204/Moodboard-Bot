@@ -80,7 +80,7 @@ class MoodyBot(commands.Cog):
             lines = [line.strip() for line in ctx.message.content.split('\n') if line.strip()]
             metadata = {
             'name': None,
-            'social_media_link': None,
+            'social': None,
             'title': None,
             'desc': None,
             'tags': None
@@ -113,7 +113,7 @@ class MoodyBot(commands.Cog):
             'description': metadata['desc'],
             'tags': metadata['tags']
         }
-
+            print (metadata['social_media_link'])
         # Create artist and submitter (your existing code)
             artist = await self.db.get_or_create_artist(
             name=data['name'],
