@@ -150,42 +150,53 @@ class MoodyBot(commands.Cog):
             self.logger.error(f"Submission error: {e}", exc_info=True)
             await ctx.send(f"⚠️ Submission failed: {str(e)}")
 
-        
-
     @commands.command(name='display')
-    async def artworks(self, ctx, page: int = 1):
-        """View your submitted artworks"""
+    async def artworks(self, ctx, artist_name: str, page: int = 1):
+        """View submitted artworks by an artist
+        Usage: !display <artist_name> [page=1]
+        """
         try:
+            # Validate page number
+            if page < 1:
+                return await ctx.send("❌ Page number must be 1 or greater")
+
             per_page = 5
+            offset = (page - 1) * per_page
+
+        # Get or create artist
             artist = await self.db.get_or_create_artist(
-                discord_id=str(ctx.author.id),
-                name=ctx.author.display_name
+                name=artist_name,
+                social_media_link=""  # Provide empty if not needed
             )
-            
-            artworks = await self.db.get_artworks(artist['id'], page, per_page)
-            total = await self.db.count_artworks(artist['id'])
-            
+
+            # Fetch artworks from database
+            artworks = await self.db.get_artworks_by_artist(
+                artist_id=artist['id'],
+                limit=per_page,
+                offset=offset
+            )
+
             if not artworks:
-                return await ctx.send("No artworks found!")
-                
+                return await ctx.send(f"No artworks found for {artist_name}")
+
+            # Create embed
             embed = discord.Embed(
-                title=f"Your Art Collection (Page {page}/{max(1, (total + per_page - 1) // per_page)})",
+                title=f"Artworks by {artist_name} (Page {page})",
                 color=0x6E85B2
             )
-            
+
             for art in artworks:
-                palette = await self.db.get_palette(art['id'])
                 embed.add_field(
-                    name=art.get('title', 'Untitled'),
-                    value=f"Colors: {', '.join(c['hex_code'] for c in palette[:3])}",
+                    name=art['title'],
+                    value=f"[View]({art['image_url']}) | {art['description'][:50]}...",
                     inline=False
                 )
-                
+
             await ctx.send(embed=embed)
-            
+
         except Exception as e:
-            self.logger.error(f"Artworks command failed: {e}")
-            await ctx.send("⚠️ Error fetching artworks")
+            self.logger.error(f"Display error: {e}", exc_info=True)
+            await ctx.send("⚠️ Failed to fetch artworks")
 
 async def main():
     try:
