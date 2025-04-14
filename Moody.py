@@ -33,39 +33,32 @@ class MoodyBot(commands.Bot):
         intents = discord.Intents.all()
         intents.message_content = True
         super().__init__(command_prefix=command_prefix, intents=intents)
-        # Initialize with None, will be set in setup_hook
-        self.db = None
-        self.analyzer = None
+        
+        self.db = MySQLStorage()
+        self.analyzer = ColorAnalyser()
         self.logger = logging.getLogger(__name__)
 
     async def setup_hook(self):
-        """Initialize resources with robust error handling"""
-        try:
-            # Initialize database first
-            self.db = MySQLStorage()
-            self.logger.info("Initializing database connection...")
-            
-            if not await self.db.initialize():
-                raise RuntimeError("Failed to initialize database connection")
-            
-            # Initialize tables
-            self.logger.info("Verifying database tables...")
-            if not await self.db.init_db():
-                self.logger.warning("Table initialization completed with warnings")
-            
-            # Initialize analyzer
-            self.analyzer = ColorAnalyser()
-            self.logger.info("✅ All components initialized successfully")
-            
-        except Exception as e:
-            self.logger.critical(f"Initialization failed: {e}")
-            await self.emergency_shutdown()
-            raise
+        """Initializes resources before login"""
+        await self.db.initialize()
+        await self.db.init_db()
+
     @commands.Cog.listener()
     async def on_ready(self):
-        """Called when the bot connects to Discord"""
-        print(f'Logged in as {self.user.name} (ID: {self.user.id})')
-        print('------')
+        """Called when connected to Discord"""
+        self.logger.info(f'Logged in as {self.user}')
+        await self.change_presence(activity=discord.Game(name="Art Collector"))
+
+    @commands.Cog.listener()
+    async def on_message(self, message):
+        """Processes all messages"""
+        # Essential for commands to work
+        await self.process_commands(message)
+        
+        # Your custom message processing
+        if message.attachments and not message.author.bot:
+            await self.process_image(message)
+
     # Additional startup tasks:
         await self.change_presence(activity=discord.Activity(type=discord.ActivityType.watching, name="for art submissions"))
     @commands.Cog.listener()
