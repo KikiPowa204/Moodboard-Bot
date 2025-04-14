@@ -33,14 +33,12 @@ class MoodyBot(commands.Bot):
         intents = discord.Intents.all()
         intents.message_content = True
         super().__init__(command_prefix=command_prefix, intents=intents)
-        
-        # Initialize components
-        self.db = MySQLStorage()
-        self.analyzer = ColorAnalyser()
+        self.add_command(MoodyBot.submit_artwork)
+        # Initialize with None, will be set in setup_hook
+        self.db = None
+        self.analyzer = None
         self.logger = logging.getLogger(__name__)
-        
-        # Remove any existing on_message override
-        self._listeners = [l for l in self._listeners if l[0] != 'on_message']
+
     async def setup_hook(self):
         """Initialize resources with robust error handling"""
         try:
