@@ -76,46 +76,94 @@ class MoodyBot(commands.Cog):
             return
 
         try:
-            lines = [line.strip() for line in args.split('\n') if line.strip()]
-            data = {'name': '', 'social': '', 'title': 'Untitled', 'desc': '', 'tags': []}
-
-            for line in lines:
-                if line.lower().startswith('name:'):
-                    data['name'] = line[5:].strip()
-                elif line.lower().startswith('social:'):
-                    data['social'] = line[7:].strip()
-                elif line.lower().startswith('title:'):
-                    data['title'] = line[6:].strip()
-                elif line.lower().startswith('desc:'):
-                    data['desc'] = line[5:].strip()
-                elif line.lower().startswith('tags:'):
-                    data['tags'] = [t.strip() for t in line[5:].split(',')]
+            # Parse metadata (your existing code)
+            lines = [line.strip() for line in ctx.message.content.split('\n') if line.strip()]
+            metadata = {
+            'name': None,
+            'social_media_link': None,
+            'title': None,
+            'desc': None,
+            'tags': None
+        }
+        
+            for line in lines[1:]:  # Skip first line (!store)
+                if ':' in line:
+                    key, value = line.split(':', 1)
+                    key = key.strip().lower()
+                    value = value.strip()
+                    if key == 'name':
+                        metadata['name'] = value
+                    elif key == 'social':
+                        metadata['social_media_link'] = value  # Fixed key name
+                    elif key == 'title':
+                        metadata['title'] = value
+                    elif key == 'desc':
+                        metadata['desc'] = value
+                    elif key == 'tags':
+                        metadata['tags'] = value
 
             image_url = ctx.message.attachments[0].url
-            
-            artist = await self.db.get_or_create_artist(
-                name=data['name'],
-                social_media=data['social']  # ✅ MATCHES function param
-        )
 
+            data = {
+            'discord_id': str(ctx.author.id),
+            'name': metadata['name'],
+            'social_media_link': metadata['social_media_link'] or "",
+            'image_url': image_url,
+            'title': metadata['title'],
+            'description': metadata['desc'],
+            'tags': metadata['tags']
+        }
+
+        # Create artist and submitter (your existing code)
+            artist = await self.db.get_or_create_artist(
+            name=data['name'],
+            social_media=data['social_media_link']
+        )
 
             submitter = await self.db.get_or_create_submitter(
-                discord_id=str(ctx.author.id),
-                name=ctx.author.display_name
+            discord_id=str(ctx.author.id),
+            name=ctx.author.display_name
         )
 
-            artwork_id = await self.db.create_artwork(
+        # Create artwork (fixed parameter names to match your DB schema)
+            artwork = await self.db.create_artwork(
             submitter_id=submitter['id'],
             artist_id=artist['id'],
             image_url=image_url,
             title=data['title'],
-            description=data['desc'],
+            description=data['description'],
             tags=data['tags']
         )
 
+        # Extract and store color palette
+            color_analyser = ColorAnalyser()
+            try:
+                colors = await color_analyser.extract_palettes(image_url)
+                await self.db.store_palette(
+                artwork_id=artwork['id'],  # Assuming create_artwork returns dict with 'id'
+                colors=colors
+            )
+            except Exception as e:
+                self.logger.error(f"Color analysis failed: {e}")
+                await ctx.send("⚠️ Color analysis failed, but artwork was submitted successfully.")
+            finally:
+                await color_analyser.close()
+
+            await ctx.send("✅ Artwork submitted successfully!")
+
+        
+            embed = discord.Embed(
+                title=f"🎨 {data['title']}",
+                description=f"By {data['artist_name']}",
+                color=0x6E85B2
+        )
+            embed.add_field(name="Tags", value=", ".join(data['tags']) or "None")
+            embed.set_image(url=data['image_url'])
+            await ctx.send(embed=embed)
+
         # (Optional: Add palette logic here)
 
-            await ctx.send(f"✅ Submitted: {data['title']} by {data['name']} (ID: {artwork_id})")
+            await ctx.send(f"✅ Submitted: {data['title']} by {data['name']} (ID: {artwork})")
 
         except Exception as e:
             self.logger.error(f"Submission error: {e}", exc_info=True)

@@ -75,6 +75,3 @@ class ColorAnalyser:
             self.http = None
 
 
-
-# Remove the module-level instance - let the bot create it when needed
-color_analyser = ColorAnalyser()  # DELETE THIS LINE

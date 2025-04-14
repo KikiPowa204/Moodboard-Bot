@@ -113,17 +113,17 @@ class MySQLStorage:
                     tables = [
                         '''CREATE TABLE IF NOT EXISTS submitters (
                             id INT AUTO_INCREMENT PRIMARY KEY,
-                            discord_id VARCHAR(255) UNIQUE NOT NULL,
+                            submitter_id VARCHAR(255) UNIQUE NOT NULL,
                             name VARCHAR(255) NOT NULL,
                             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4''',
                         
                         '''CREATE TABLE IF NOT EXISTS artists (
                             id INT AUTO_INCREMENT PRIMARY KEY,
-                            name VARCHAR(255) NOT NULL,
+                            artist_name VARCHAR(255) NOT NULL,
                             social_media_link TEXT,
                             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                            INDEX idx_artist_name (name)
+                            INDEX idx_artist_name (artist_name)
                         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4''',
                         
                         '''CREATE TABLE IF NOT EXISTS artworks (
