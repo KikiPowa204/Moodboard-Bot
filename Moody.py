@@ -70,13 +70,13 @@ class MoodyBot(commands.Cog):
             self.logger.error(f"Emergency shutdown error: {e}")
     @commands.command(name='submit')
     async def submit_artwork(self, ctx, *, args: str):
-        """Submit artwork: !submit Artist, [social], [title], [desc], [tags]"""
+        """Submit artwork: !submit Name:..., Social:..., Title:..., Desc:..., Tags:..."""
         if not ctx.message.attachments:
             await ctx.send("❌ Please attach an image file!")
             return
 
         try:
-            lines = args.split('\n')
+            lines = [line.strip() for line in args.split('\n') if line.strip()]
             data = {'name': '', 'social': '', 'title': 'Untitled', 'desc': '', 'tags': []}
 
             for line in lines:
@@ -91,21 +91,18 @@ class MoodyBot(commands.Cog):
                 elif line.lower().startswith('tags:'):
                     data['tags'] = [t.strip() for t in line[5:].split(',')]
 
-        # Process image
             image_url = ctx.message.attachments[0].url
 
-        # Get/create records
             artist = await self.db.get_or_create_artist(
-            name=data['name'],
-            social_media=data['social']  # Ensure parameter matches actual method
+                name=data['name'],
+                social_media=data['social']  # ✅ MATCHES function param
         )
 
             submitter = await self.db.get_or_create_submitter(
-            discord_id=str(ctx.author.id),
-            name=ctx.author.display_name
+                discord_id=str(ctx.author.id),
+                name=ctx.author.display_name
         )
 
-        # Store artwork
             artwork_id = await self.db.create_artwork(
             submitter_id=submitter['id'],
             artist_id=artist['id'],
@@ -115,26 +112,14 @@ class MoodyBot(commands.Cog):
             tags=data['tags']
         )
 
-        # Analyze and store palette (same as before)
-            async with aiohttp.ClientSession() as session:
-                async with session.get(image_url) as resp:
-                    if resp.status == 200:
-                        data_img = await resp.read()
-                        with io.BytesIO(data_img) as img_data:
-                            palette = await self.analyzer.extract_palettes(img_data)
-                            for i, color in enumerate(palette[:5]):
-                                await self.db.add_color_to_palette(
-                                artwork_id=artwork_id,
-                                hex_code=color['hex'],
-                                dominance_rank=i+1,
-                                coverage=color['percentage']
-                            )
+        # (Optional: Add palette logic here)
 
             await ctx.send(f"✅ Submitted: {data['title']} by {data['name']} (ID: {artwork_id})")
 
         except Exception as e:
             self.logger.error(f"Submission error: {e}", exc_info=True)
-            await ctx.send("⚠️ Submission failed. Please use the correct format.")
+            await ctx.send("⚠️ Submission failed. Please check your format and try again.")
+
 
     @commands.command(name='display')
     async def artworks(self, ctx, page: int = 1):
