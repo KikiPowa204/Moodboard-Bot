@@ -183,7 +183,7 @@ async def main():
             raise ValueError("DISCORD_TOKEN environment variable missing")
         
         bot = MoodyBot()
-        await bot.start(token)  # Better than run() for control
+        await bot.run(token)  # Better than run() for control
         
     except Exception as e:
         logging.critical(f"Fatal error: {e}")
