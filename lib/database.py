@@ -248,16 +248,22 @@ class MySQLStorage:
                     artist['social_media_link'] = social_media_link
             
                 return artist
-    async def get_artworks_by_artist(self, artist_id: int, limit: int, offset: int):
+    async def get_artworks_by_artist(self, artist_id: int, page: int = 1, per_page: int = 10):
+        offset = (page - 1) * per_page
+        query = """
+            SELECT 
+                a.*,
+                GROUP_CONCAT(at.tag SEPARATOR ', ') as tags
+            FROM artworks a
+            LEFT JOIN artwork_tags at ON a.id = at.artwork_id
+            WHERE a.artist_id = %s
+            GROUP BY a.id
+            ORDER BY a.created_at DESC
+            LIMIT %s OFFSET %s
+        """
         async with self.pool.acquire() as conn:
-            async with conn.cursor() as cursor:
-                await cursor.execute(
-                """SELECT * FROM artworks 
-                WHERE artist_id = %s 
-                ORDER BY created_at DESC
-                LIMIT %s OFFSET %s""",
-                (artist_id, limit, offset)
-            )
+            async with conn.cursor(aiomysql.DictCursor) as cursor:
+                await cursor.execute(query, (artist_id, per_page, offset))
                 return await cursor.fetchall()
     async def create_artwork(self, submitter_id: int, artist_id: int, image_url: str, 
                              title: str, description: str, tags: List[str]):
@@ -331,7 +337,7 @@ class MySQLStorage:
             FROM color_palettes
             WHERE artwork_id = %s
         '''
-    
+        print (f'Made it past query in get_artwork_palette')
         async with self.pool.acquire() as conn:
             async with conn.cursor(aiomysql.DictCursor) as cursor:
                 await cursor.execute(query, (artwork_id,))

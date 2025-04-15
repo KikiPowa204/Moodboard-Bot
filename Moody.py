@@ -156,25 +156,29 @@ class MoodyBot(commands.Cog):
         :param colors: List of hex color codes (e.g., ["#FF5733", "#33FF57"])
         :return: BytesIO buffer containing PNG image
         """
-        # Create blank image
-        img = Image.new('RGB', (width, height))
-        draw = ImageDraw.Draw(img)
+        try:
+            # Create blank image
+            img = Image.new('RGB', (width, height))
+            draw = ImageDraw.Draw(img)
     
-        # Calculate color block widths
-        block_width = width // len(colors)
+            # Calculate color block widths
+            block_width = width // len(colors)
     
-        # Draw each color
-        for i, hex_color in enumerate(colors):
-            x0 = i * block_width
-            x1 = x0 + block_width
-            rgb = tuple(int(hex_color.lstrip('#')[i:i+2], 16) for i in (0, 2, 4))
-            draw.rectangle([x0, 0, x1, height], fill=rgb)
+            # Draw each color
+            for i, hex_color in enumerate(colors):
+                x0 = i * block_width
+                x1 = x0 + block_width
+                rgb = tuple(int(hex_color.lstrip('#')[i:i+2], 16) for i in (0, 2, 4))
+                draw.rectangle([x0, 0, x1, height], fill=rgb)
     
-        # Save to bytes buffer
-        buffer = io.BytesIO()
-        img.save(buffer, format='PNG')
-        buffer.seek(0)
-        return buffer
+            # Save to bytes buffer
+            buffer = io.BytesIO()
+            img.save(buffer, format='PNG')
+            buffer.seek(0)
+            return buffer
+        except Exception as e:
+            raise e
+    
     @commands.command(name='showpalette', aliases=['palette', 'colors'])
     async def show_palette(self, ctx):
         """Display color palette by replying to an artwork message"""
