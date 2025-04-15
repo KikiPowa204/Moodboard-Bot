@@ -2,7 +2,7 @@ import aiomysql
 import os
 import logging
 from urllib.parse import urlparse
-from typing import Optional, Dict, List, Union
+from typing import Optional, Dict, List, Union, Any
 from mysql.connector import connect, Error  # Import MySQL connector
 import asyncio
 import os
@@ -323,7 +323,7 @@ class MySQLStorage:
             async with conn.cursor() as cursor:
                 await cursor.executemany(query, palette_data)
                 await conn.commit()
-    async def get_artwork_palette(self, artwork_id: int):
+    async def get_artwork_palette(self, artwork_id: int) -> List[Dict[str, Any]]:
         """Retrieve and properly format color palette"""
         query = '''
             SELECT 
