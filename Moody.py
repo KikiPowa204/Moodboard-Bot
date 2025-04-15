@@ -471,51 +471,50 @@ class MoodyBot(commands.Cog):
             self.logger.error(f"Cluster check failed: {e}")
             return False
     @commands.command(name='art')
-    async def fetch_artwork(self, ctx, *, tag: str):
-        """Display artworks with embedded images matching the tag"""
+    async def fetch_artwork(self, ctx, *, tag: str = None):
+        """Display random artworks (optionally matching a tag)"""
         try:
-            tag = tag.strip().lower()
-            if not tag:
-                return await ctx.send("Please provide a valid tag.")
+            # If no tag provided, get completely random art
+            if not tag or tag.strip().lower() == "random":
+                artworks = await self.db.get_random_artworks(5)
+            else:
+                tag = tag.strip().lower()
+                artworks = await self.db.get_artworks_with_artist_info(tag)
+                # Shuffle the results if we have a tag filter
+                if artworks:
+                    random.shuffle(artworks)
+                    artworks = artworks[:5]
 
-            # Get artworks with artist info included
-            artworks = await self.db.get_artworks_with_artist_info(tag)
-            
             if not artworks:
-                return await ctx.send(f"No artworks found matching: {tag}")
+                return await ctx.send("No artworks found!")
 
-            for art in artworks[:5]:  # Show first 3 results
+            for art in artworks:
                 embed = discord.Embed(
                     title=art.get('title', 'Untitled'),
                     color=0x6E85B2
                 )
                 
-                # Set image
                 if art.get('image_url'):
                     embed.set_image(url=art['image_url'])
                 
-                # Add artist info if available
                 if art.get('artist_name'):
                     author_data = {"name": f"Artist: {art['artist_name']}"}
                     if art.get('social_media_link'):
                         author_data["url"] = art['social_media_link']
-                        author_data["icon_url"] = "https://cdn.discordapp.com/emojis/896043487135748106.png"  # Link icon
                     embed.set_author(**author_data)
-                embed.set_footer(text=f'Artwork ID: {art["id"]}')
-                # Add tags if available - FIXED THIS SECTION
+                
                 if art.get('tags'):
-                    tags_list = art['tags'].split(',')[:50]  # First limit the list
                     embed.add_field(
                         name="Tags",
-                        value=", ".join(tags_list),  # Then join without length parameter
+                        value=", ".join(art['tags'].split(',')[:10]),  # Show first 10 tags
                         inline=False
                     )
                 
                 await ctx.send(embed=embed)
 
         except Exception as e:
-            await ctx.send(f"Error displaying artwork: {str(e)}")
-            self.logger.error(f"Embed error: {e}", exc_info=True)
+            await ctx.send(f"Error fetching artwork: {str(e)}")
+            self.logger.error(f"Art fetch error: {e}", exc_info=True)
 
     @commands.command(name='overlap')
     async def show_palette_overlap(self, ctx, *, theme: str):
