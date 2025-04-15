@@ -180,7 +180,7 @@ class MoodyBot(commands.Cog):
                 if dominant_color:
                     hex_code = dominant_color['hex_code']
                     color_stats[hex_code] = color_stats.get(hex_code, 0) + 1
-        
+            print (color_stats)
             # 3. Get top 5 most frequent colors
             top_colors = sorted(color_stats.items(), key=lambda x: x[1], reverse=True)[:5]
             hex_colors = [color[0] for color in top_colors]
