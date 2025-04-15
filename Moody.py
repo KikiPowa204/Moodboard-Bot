@@ -206,13 +206,16 @@ class MoodyBot(commands.Cog):
             print (f'in show_palette. Artwork_ID: {artwork_id}')
             # Get palette from database
             palette = await self.db.get_artwork_palette(artwork_id)
+            print ('Processed get_artwork_palette')
             if not palette:
                 return await ctx.send("❌ No palette found for this artwork!")
         
             # Generate and send palette
-            hex_colors = [color['hex_code'] for color in palette]
-            image_buffer = self.generate_palette_image(hex_colors)
-        
+            try:
+                hex_colors = [color['hex_code'] for color in palette]
+                image_buffer = self.generate_palette_image(hex_colors)
+            except Exception as e:
+                raise
             embed = discord.Embed(
                 title=f"🎨 Color Palette for Artwork #{artwork_id}",
                 color=int(hex_colors[0].lstrip('#'), 16)
