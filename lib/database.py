@@ -323,13 +323,10 @@ class MySQLStorage:
             async with conn.cursor() as cursor:
                 await cursor.executemany(query, palette_data)
                 await conn.commit()
-    async def get_artwork_palette(self, artwork_id):
-        """Get palette with bulletproof type handling"""
+    async def get_artwork_palette(self, artwork_id: int):
+        """Get palette with nuclear-grade type validation"""
         query = '''
-            SELECT 
-                hex_code, 
-                dominance_rank,
-                coverage
+            SELECT hex_code, dominance_rank, coverage
             FROM color_palettes
             WHERE artwork_id = %s
         '''
@@ -337,23 +334,43 @@ class MySQLStorage:
         async with self.pool.acquire() as conn:
             async with conn.cursor(aiomysql.DictCursor) as cursor:
                 await cursor.execute(query, (artwork_id,))
-                raw_palette = await cursor.fetchall()
+                raw_data = await cursor.fetchall()
             
-                # Force proper types
-                palette = []
-                for color in raw_palette:
+                validated_palette = []
+                for color in raw_data:
                     try:
-                        palette.append({
-                            'hex_code': str(color['hex_code']),
-                            'dominance_rank': int(float(color['dominance_rank'])),  # Double conversion safety
-                            'coverage': float(color['coverage']) if color['coverage'] is not None else 0.0
+                        # Convert EVERY field with safety checks
+                        hex_code = str(color['hex_code']) if color.get('hex_code') else '#000000'
+                    
+                        # Dominance rank must be convertable to int
+                        try:
+                            dom_rank = int(float(color['dominance_rank']))
+                        except:
+                            dom_rank = 999  # Default high value for invalid entries
+                    
+                        # Coverage must be convertable to float
+                        try:
+                            coverage = float(color['coverage']) if color.get('coverage') is not None else 0.0
+                        except:
+                            coverage = 0.0
+                    
+                        validated_palette.append({
+                            'hex_code': hex_code,
+                            'dominance_rank': dom_rank,
+                            'coverage': coverage
                         })
-                    except (ValueError, TypeError) as e:
-                        self.logger.warning(f"Bad color data: {color} - {e}")
+                    except Exception as e:
+                        self.logger.error(f"Corrupt color data skipped: {color} - {e}")
                         continue
             
-                # Sort with guaranteed valid types
-                return sorted(palette, key=lambda x: int(x['dominance_rank']))
+                # Now sort with guaranteed valid types
+                return sorted(
+                    validated_palette,
+                    key=lambda x: (
+                        x['dominance_rank'],
+                        -x['coverage']  # Secondary sort by coverage descending
+                    )
+                )
     async def close(self) -> None:
         """Cleanup resources when stopping"""
         if self.pool:

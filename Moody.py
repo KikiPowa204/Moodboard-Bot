@@ -227,7 +227,7 @@ class MoodyBot(commands.Cog):
         
         except Exception as e:
             await ctx.send(f"❌ Error generating palette: {str(e)}")
-    @commands.command(name='display')
+    @commands.command(name='artist')
     async def artworks(self, ctx, artist_name: str, page: int = 1):
         """View submitted artworks by an artist
         Usage: !display <artist_name> [page=1]
