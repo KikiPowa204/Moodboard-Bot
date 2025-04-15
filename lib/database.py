@@ -323,29 +323,37 @@ class MySQLStorage:
             async with conn.cursor() as cursor:
                 await cursor.executemany(query, palette_data)
                 await conn.commit()
-    async def get_artwork_palette(self, artwork_id: int) -> List[Dict[str, Any]]:
-        """Retrieve and properly format color palette"""
+    async def get_artwork_palette(self, artwork_id):
+        """Get palette with bulletproof type handling"""
         query = '''
             SELECT 
                 hex_code, 
-                CAST(dominance_rank AS SIGNED) as dominance_rank,
-                CAST(coverage AS DECIMAL(5,2)) as coverage
+                dominance_rank,
+                coverage
             FROM color_palettes
             WHERE artwork_id = %s
-            ORDER BY dominance_rank ASC
         '''
     
         async with self.pool.acquire() as conn:
             async with conn.cursor(aiomysql.DictCursor) as cursor:
                 await cursor.execute(query, (artwork_id,))
-                palette = await cursor.fetchall()
+                raw_palette = await cursor.fetchall()
             
-                # Ensure proper numeric types
-                for color in palette:
-                    color['dominance_rank'] = int(color['dominance_rank'])
-                    color['coverage'] = float(color['coverage']) if color['coverage'] is not None else 0.0
-                
-                return palette
+                # Force proper types
+                palette = []
+                for color in raw_palette:
+                    try:
+                        palette.append({
+                            'hex_code': str(color['hex_code']),
+                            'dominance_rank': int(float(color['dominance_rank'])),  # Double conversion safety
+                            'coverage': float(color['coverage']) if color['coverage'] is not None else 0.0
+                        })
+                    except (ValueError, TypeError) as e:
+                        self.logger.warning(f"Bad color data: {color} - {e}")
+                        continue
+            
+                # Sort with guaranteed valid types
+                return sorted(palette, key=lambda x: int(x['dominance_rank']))
     async def close(self) -> None:
         """Cleanup resources when stopping"""
         if self.pool:
