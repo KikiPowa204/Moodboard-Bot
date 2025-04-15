@@ -269,9 +269,10 @@ class MoodyBot(commands.Cog):
                     inline=False
                 )
                 embed.set_image(url=art['image_url'])
-
-            await ctx.send(embed=embed)
-
+                embed.add_field(name="Tags", value=", ".join(art['tags']) if art['tags'] else "None")
+                embed.set_footer(text=f'Artwork ID: {art['id']}')
+                await ctx.send(embed=embed)    
+            
         except Exception as e:
             self.logger.error(f"Display error: {e}", exc_info=True)
             await ctx.send("⚠️ Failed to fetch artworks")
