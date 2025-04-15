@@ -189,9 +189,10 @@ class MoodyBot(commands.Cog):
             for art in artworks:
                 embed.add_field(
                     name=art['title'],
-                    value=f"[View]({art['image_url']}) | {art['description'][:50]}...",
+                    value=f"{art['description'][:50]}...",
                     inline=False
                 )
+                embed.set_image(url=art['image_url'])
 
             await ctx.send(embed=embed)
 
