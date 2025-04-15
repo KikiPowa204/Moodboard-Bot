@@ -493,7 +493,7 @@ class MoodyBot(commands.Cog):
                     title=art.get('title', 'Untitled'),
                     color=0x6E85B2
                 )
-            if art.get('social_media_link'):
+
                 embed.add_field(
                     art['social_media_link']
                 )
