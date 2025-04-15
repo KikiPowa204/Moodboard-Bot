@@ -471,6 +471,93 @@ class MoodyBot(commands.Cog):
             self.logger.error(f"Cluster check failed: {e}")
             return False
 
+    @commands.command(name='art')
+    async def fetch_artwork(self, ctx, *, tags: str):
+        """Display artworks matching the given tags (comma-separated)"""
+        try:
+            per_page = 5
+            page = 1  # Could be made into a parameter later
+            offset = (page - 1) * per_page
+
+            # Split and clean tags
+            tag_list = [tag.strip().lower() for tag in tags.split(',') if tag.strip()]
+            
+            if not tag_list:
+                return await ctx.send("Please provide at least one valid tag.")
+
+            # Get artworks matching ALL tags (for OR matching, you'd need to modify the query)
+            artworks = await self.db.get_artworks_by_tags(
+                tags=tag_list,
+                limit=per_page,
+                offset=offset,
+                match_all=True  # Assuming your method can handle this
+            )
+
+            if not artworks:
+                return await ctx.send(f"No artworks found matching all tags: {', '.join(tag_list)}")
+
+            for art in artworks:
+                # Get artist info
+                artist = await self.db.get_artist_by_id(art['artist_id'])
+                
+                # Get all tags for this artwork (not just the search tags)
+                artwork_tags = await self.db.get_artwork_tags(art['id'])
+                
+                # Get submitter info if available
+                submitter = await self.db.get_submitter_by_id(art['submitter_id'])
+                
+                # Get color palette if available
+                colors = await self.db.get_colors_for_artwork(art['id'])
+                
+                # Create embed
+                embed = discord.Embed(
+                    title=art.get('title', 'Untitled'),
+                    description=art.get('description', 'No description')[:200] + ('...' if len(art.get('description', '')) > 200 else ''),
+                    color=0x6E85B2,
+                    timestamp=art['created_at']
+                )
+                embed.set_image(url=art['image_url'])
+                
+                # Add artist field
+                if artist:
+                    embed.set_author(
+                        name=artist['artist_name'],
+                        url=artist.get('social_media_link', ''),
+                        icon_url="https://cdn.discordapp.com/emojis/896043487135748106.png"  # Example palette icon
+                    )
+                
+                # Add submitter info if available
+                if submitter:
+                    embed.add_field(
+                        name="Submitted by",
+                        value=submitter['name'],
+                        inline=True
+                    )
+                
+                # Add color palette if available
+                if colors:
+                    color_display = " ".join([f"`{c['hex_code']}`" for c in colors[:5]])
+                    embed.add_field(
+                        name="Color Palette",
+                        value=color_display,
+                        inline=False
+                    )
+                
+                # Add all tags
+                if artwork_tags:
+                    embed.add_field(
+                        name="Tags",
+                        value=", ".join(artwork_tags),
+                        inline=False
+                    )
+                
+                embed.set_footer(text=f"Artwork ID: {art['id']} • {art['created_at'].strftime('%b %d, %Y')}")
+                await ctx.send(embed=embed)
+
+        except Exception as e:
+            await ctx.send(f"🚨 Error fetching artworks: {str(e)}")
+            self.logger.error(f"Fetch artwork error: {e}", exc_info=True)    
+
     @commands.command(name='overlap')
     async def show_palette_overlap(self, ctx, *, theme: str):
         """Show artworks with consistent color palette overlaps"""
