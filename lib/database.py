@@ -259,8 +259,7 @@ class MySQLStorage:
                     LIMIT %s OFFSET %s
                 """, (artist_id, limit, offset))
                 return await cursor.fetchall()
-    async def create_artwork(self, submitter_id: int, artist_id: int, image_url: str, 
-                             title: str, description: str, tags: List[str]):
+    async def create_artwork(self, submitter_id: int, artist_id: int, image_url: str, title: str, description: str, tags: List[str]):
         async with self.pool.acquire() as conn:
             async with conn.cursor() as cursor:
                 await cursor.execute(
@@ -333,56 +332,48 @@ class MySQLStorage:
                 )
                 tags = await cursor.fetchall()
                 return [tag['tag'] for tag in tags]
-
+    def safe_sort_palette(palette):
+        """Sort palette with absolute type safety"""
+        def sort_key(color):
+            try:
+                # Convert dominance_rank to int (default to 999 if invalid)
+                rank = int(color.get('dominance_rank', 999))
+            except (ValueError, TypeError):
+                rank = 999
+        
+            try:
+                # Convert coverage to float (default to 0.0 if invalid)
+                coverage = float(color.get('coverage', 0.0))
+            except (ValueError, TypeError):
+                coverage = 0.0
+        
+            # Return tuple with validated values
+            return (rank, -coverage)  # Negative for descending coverage
+    
+        return sorted(palette, key=sort_key)
     async def get_artwork_palette(self, artwork_id: int):
-        """Get palette with nuclear-grade type validation"""
-        print (f'In get_artwork_palette. Artwork_ID: {artwork_id}')
+        """Get palette with guaranteed sorting"""
         query = '''
             SELECT hex_code, dominance_rank, coverage
             FROM color_palettes
             WHERE artwork_id = %s
         '''
-        print (f'Made it past query in get_artwork_palette')
+    
         async with self.pool.acquire() as conn:
             async with conn.cursor(aiomysql.DictCursor) as cursor:
                 await cursor.execute(query, (artwork_id,))
-                raw_data = await cursor.fetchall()
+                raw_palette = await cursor.fetchall()
             
-                validated_palette = []
-                for color in raw_data:
-                    try:
-                        # Convert EVERY field with safety checks
-                        hex_code = str(color['hex_code']) if color.get('hex_code') else '#000000'
-                    
-                        # Dominance rank must be convertable to int
-                        try:
-                            dom_rank = int(float(color['dominance_rank']))
-                        except:
-                            dom_rank = 999  # Default high value for invalid entries
-                    
-                        # Coverage must be convertable to float
-                        try:
-                            coverage = float(color['coverage']) if color.get('coverage') is not None else 0.0
-                        except:
-                            coverage = 0.0
-                    
-                        validated_palette.append({
-                            'hex_code': hex_code,
-                            'dominance_rank': dom_rank,
-                            'coverage': coverage
-                        })
-                    except Exception as e:
-                        self.logger.error(f"Corrupt color data skipped: {color} - {e}")
-                        continue
+                # Validate all fields exist
+                validated = []
+                for color in raw_palette:
+                    validated.append({
+                        'hex_code': color.get('hex_code', '#000000'),
+                        'dominance_rank': color.get('dominance_rank'),
+                        'coverage': color.get('coverage')
+                    })
             
-                # Now sort with guaranteed valid types
-                return sorted(
-                    validated_palette,
-                    key=lambda x: (
-                        x['dominance_rank'],
-                        -x['coverage']  # Secondary sort by coverage descending
-                    )
-                )
+                return self.safe_sort_palette(validated)
     async def close(self) -> None:
         """Cleanup resources when stopping"""
         if self.pool:
