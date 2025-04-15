@@ -269,7 +269,7 @@ class MoodyBot(commands.Cog):
                     inline=False
                 )
                 embed.set_image(url=art['image_url'])
-                embed.add_field(name="Tags", value=", ".join(art['tags']) if art['tags'] else "None")
+                embed.add_field(name="Tags", value=", ".join(art['tag']) if art['tag'] else "None")
                 embed.set_footer(text=f'Artwork ID: {art['id']}')
                 await ctx.send(embed=embed)    
             
