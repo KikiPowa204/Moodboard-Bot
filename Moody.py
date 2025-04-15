@@ -150,7 +150,7 @@ class MoodyBot(commands.Cog):
             self.logger.error(f"Submission error: {e}", exc_info=True)
             await ctx.send(f"⚠️ Submission failed: {str(e)}")
     
-    def generate_palette_image(colors: list, width=400, height=100) -> io.BytesIO:
+    def generate_palette_image(self, colors: list, width=400, height=100) -> io.BytesIO:
         """
         Generate a color palette image
         :param colors: List of hex color codes (e.g., ["#FF5733", "#33FF57"])
