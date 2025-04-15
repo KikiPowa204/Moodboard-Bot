@@ -484,7 +484,7 @@ class MoodyBot(commands.Cog):
             if not artworks:
                 return await ctx.send(f"No artworks found matching: {tag}")
 
-            for art in artworks[:3]:  # Show first 3 results
+            for art in artworks[:5]:  # Show first 3 results
                 embed = discord.Embed(
                     title=art.get('title', 'Untitled'),
                     color=0x6E85B2
