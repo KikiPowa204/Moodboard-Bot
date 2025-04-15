@@ -427,28 +427,172 @@ class MoodyBot(commands.Cog):
         delta_e = delta_e_cie2000(color_lab, cluster_center)
         return delta_e < threshold
 
-    def _hex_to_lab(self, hex_color, reference_color):
-        """Convert hex color to LAB and calculate Delta-E with reference color"""
+    def _hex_to_lab(self, hex_color):
+        """Convert hex color to LAB color space"""
         try:
-            # Convert hex color to RGB
             rgb = tuple(int(hex_color.lstrip('#')[i:i+2], 16) for i in (0, 2, 4))
-            
-            # Convert RGB to LAB
-            color_rgb = sRGBColor.new_from_rgb_triplet(*rgb)
-            color_lab = convert_color(color_rgb, LabColor)
-
-            # Get the LAB values for reference color (dominant color)
-            lab1 = (reference_color.lab_l, reference_color.lab_a, reference_color.lab_b)
-            lab2 = (color_lab.lab_l, color_lab.lab_a, color_lab.lab_b)
-            
-            # Calculate the Delta-E between the reference color and the target color
-            delta_e = delta_e_cie2000(lab1, lab2)
-
-            return delta_e
+            srgb = sRGBColor(*rgb, is_upscaled=True)
+            return convert_color(srgb, LabColor)
         except Exception as e:
-            self.logger.warning(f"Color conversion or Delta-E calculation failed: {e}")
-            return None
+            self.logger.error(f"Color conversion failed for {hex_color}: {e}")
+            return LabColor(50, 0, 0)  # Neutral gray as fallback
 
+    def _get_lab_values(self, lab_color):
+        """Extract LAB components as tuple"""
+        return (lab_color.lab_l, lab_color.lab_a, lab_color.lab_b)
+
+    def _calculate_delta_e(self, hex1, hex2):
+        """Calculate color difference between two hex colors"""
+        try:
+            lab1 = self._hex_to_lab(hex1)
+            lab2 = self._hex_to_lab(hex2)
+            return delta_e_cie2000(
+                LabColor(*self._get_lab_values(lab1)),
+                LabColor(*self._get_lab_values(lab2))
+            )
+        except Exception as e:
+            self.logger.error(f"Delta-E calculation failed: {e}")
+            return 100.0  # Max difference on error
+
+    async def _cluster_artwork_colors(self, artworks, n_clusters=5):
+        """Cluster artwork colors using perceptual difference"""
+        try:
+            # Collect all dominant colors
+            all_colors = []
+            for artwork in artworks:
+                palette = await self.db.get_artwork_palette(artwork['id'])
+                if palette:
+                    dominant = sorted(palette, key=lambda x: x['dominance_rank'])[:3]
+                    all_colors.extend([color['hex_code'] for color in dominant])
+            
+            if len(all_colors) < n_clusters:
+                return []
+
+            # Convert to LAB space for clustering
+            lab_data = np.array([
+                self._get_lab_values(self._hex_to_lab(hex_color))
+                for hex_color in all_colors
+            ])
+
+            # Perform clustering
+            kmeans = KMeans(
+                n_clusters=min(n_clusters, len(all_colors)),
+                random_state=42,
+                n_init=10
+            ).fit(lab_data)
+
+            # Build cluster info
+            clusters = []
+            for i in range(kmeans.n_clusters):
+                cluster_colors = [
+                    all_colors[j] 
+                    for j in range(len(all_colors)) 
+                    if kmeans.labels_[j] == i
+                ]
+                
+                if cluster_colors:
+                    # Find closest color to center
+                    center_lab = LabColor(*kmeans.cluster_centers_[i])
+                    closest_color = min(
+                        cluster_colors,
+                        key=lambda x: self._calculate_delta_e(
+                            x, 
+                            convert_color(center_lab, sRGBColor).get_rgb_hex()
+                        )
+                    )
+                    
+                    clusters.append({
+                        'center': center_lab,
+                        'representative': closest_color,
+                        'colors': cluster_colors,
+                        'size': len(cluster_colors)
+                    })
+
+            return sorted(clusters, key=lambda x: x['size'], reverse=True)
+
+        except Exception as e:
+            self.logger.error(f"Clustering failed: {e}")
+            return []
+
+    def _color_in_cluster(self, hex_color, cluster, threshold=15.0):
+        """Check if color belongs to a cluster"""
+        try:
+            color_lab = self._hex_to_lab(hex_color)
+            delta_e = delta_e_cie2000(
+                color_lab,
+                cluster['center']
+            )
+            return delta_e < threshold
+        except Exception as e:
+            self.logger.error(f"Cluster check failed: {e}")
+            return False
+
+    @commands.command(name='paletteoverlap')
+    async def show_palette_overlap(self, ctx, *, theme: str):
+        """Show artworks with consistent color palette overlaps"""
+        try:
+            # Get artworks with theme tag
+            theme_artworks = await self.db.get_artworks_by_tag(theme.lower())
+            if not theme_artworks:
+                return await ctx.send(f"❌ No artworks found with '{theme}' tag")
+
+            # Cluster colors
+            color_clusters = await self._cluster_artwork_colors(theme_artworks)
+            if not color_clusters:
+                return await ctx.send(f"❌ No color patterns found for '{theme}'")
+
+            # Score artworks by cluster matches
+            scored_artworks = []
+            for artwork in theme_artworks:
+                palette = await self.db.get_artwork_palette(artwork['id'])
+                if not palette:
+                    continue
+                
+                matches = 0
+                matched_colors = []
+                for color in palette:
+                    for cluster in color_clusters:
+                        if self._color_in_cluster(color['hex_code'], cluster):
+                            matches += 1
+                            matched_colors.append(color['hex_code'])
+                            break
+                
+                if matches > 0:
+                    scored_artworks.append({
+                        'artwork': artwork,
+                        'score': matches,
+                        'matched_colors': matched_colors
+                    })
+
+            # Sort and get top matches
+            top_artworks = sorted(scored_artworks, key=lambda x: x['score'], reverse=True)[:5]
+            if not top_artworks:
+                return await ctx.send("❌ No artworks matched the color clusters")
+
+            # Generate and send visualization
+            image_buffer = await self._generate_overlap_visualization(top_artworks, color_clusters)
+            file = discord.File(image_buffer, filename="palette_overlap.png")
+
+            embed = discord.Embed(
+                title=f"🎨 Color Overlaps in '{theme}'",
+                description=f"Top {len(top_artworks)} most consistent artworks",
+                color=0x6E85B2
+            )
+            embed.set_image(url="attachment://palette_overlap.png")
+            
+            # Add cluster info
+            for i, cluster in enumerate(color_clusters[:3], 1):
+                embed.add_field(
+                    name=f"Color Group #{i}",
+                    value=f"Base: `{cluster['representative']}`\nMatches: {cluster['size']}",
+                    inline=True
+                )
+
+            await ctx.send(file=file, embed=embed)
+
+        except Exception as e:
+            await ctx.send(f"❌ Error: {str(e)}")
+            self.logger.error(f"Palette overlap error: {traceback.format_exc()}")
 
     async def _generate_overlap_comparison(self, artworks, clusters):
         """Generate visual comparison of palette overlaps"""
