@@ -307,6 +307,8 @@ class MySQLStorage:
 
     async def store_palette(self, artwork_id: int, colors: List[Dict[str, Union[str, float]]]) -> None:
         """Store color palette for an artwork"""
+        
+        
         query = '''
             INSERT INTO color_palettes (artwork_id, hex_code, dominance_rank, coverage)
             VALUES (%s, %s, %s, %s)
@@ -321,6 +323,30 @@ class MySQLStorage:
             async with conn.cursor() as cursor:
                 await cursor.executemany(query, palette_data)
                 await conn.commit()
+    async def get_artwork_palette(self, artwork_id: int) -> List[Dict]:
+        """More robust version with validation"""
+        if not isinstance(artwork_id, int) or artwork_id < 1:
+            raise ValueError("Invalid artwork ID")
+    
+        query = '''
+            SELECT 
+                hex_code, 
+                dominance_rank, 
+                ROUND(coverage, 2) as coverage
+            FROM color_palettes
+            WHERE artwork_id = %s
+            ORDER BY dominance_rank
+        '''
+    
+        try:
+            async with self.pool.acquire() as conn:
+                async with conn.cursor(aiomysql.DictCursor) as cursor:
+                    await cursor.execute(query, (artwork_id,))
+                    return await cursor.fetchall() or []
+                
+        except Exception as e:
+            self.logger.error(f"Failed to fetch palette: {e}")
+            return []
 
     async def close(self) -> None:
         """Cleanup resources when stopping"""
