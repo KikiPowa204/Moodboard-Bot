@@ -136,6 +136,7 @@ class MySQLStorage:
                             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                             FOREIGN KEY (submitter_id) REFERENCES submitters(id),
                             FOREIGN KEY (artist_id) REFERENCES artists(id),
+                            FOREIGN KEY (social_media_link) REFERENCES artists(id),
                             INDEX idx_artist (artist_id),
                             INDEX idx_submitter (submitter_id)
                         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4''',

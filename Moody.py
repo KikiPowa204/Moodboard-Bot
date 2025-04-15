@@ -491,12 +491,12 @@ class MoodyBot(commands.Cog):
                     
                 embed = discord.Embed(
                     title=art.get('title', 'Untitled'),
+                    socials=art.get('social_media_link'),
                     color=0x6E85B2
                 )
-                
                 # Set image as embed content (not thumbnail)
                 embed.set_image(url=art['image_url'])
-                
+                embed.set_footer(text=f'Artwork ID: {art["id"]}')
                 # Add additional info
                 if art.get('tags'):
                     embed.add_field(
