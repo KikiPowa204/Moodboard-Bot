@@ -332,7 +332,7 @@ class MySQLStorage:
                 )
                 tags = await cursor.fetchall()
                 return [tag['tag'] for tag in tags]
-    def safe_sort_palette(palette):
+    def safe_sort_palette(self, palette):
         """Sort palette with absolute type safety"""
         def sort_key(color):
             try:
