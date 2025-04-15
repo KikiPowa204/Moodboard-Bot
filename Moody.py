@@ -36,7 +36,7 @@ class MoodyBot(commands.Cog):
         self.db = MySQLStorage()
         self.analyzer = ColorAnalyser()
         self.logger = logging.getLogger(__name__)
-    
+        self.pending_submissions = {}
     @commands.Cog.listener()
     async def on_ready(self):
         """Called when connected to Discord"""
@@ -50,14 +50,27 @@ class MoodyBot(commands.Cog):
 
     @commands.Cog.listener()
     async def on_message(self, message):
-        """Processes all messages"""
-        await self.bot.process_commands(message)
+        """Processes non-command messages with images"""
+        if message.author.bot or message.content.startswith(self.bot.command_prefix):
+            return
         
-        # Fixed: Use self.bot.command_prefix
-        if (message.attachments 
-            and not message.author.bot
-            and not message.content.startswith(self.bot.command_prefix)):
-            await self._process_non_command_image(message)
+        if message.attachments:
+            # Check for duplicate processing
+            if message.id in self.pending_submissions:
+                return
+                
+            self.pending_submissions[message.id] = True
+            try:
+                await self._process_non_command_image(message)
+            finally:
+                self.pending_submissions.pop(message.id, None)
+    async def _process_non_command_image(self, message):
+        """Handle image submissions that aren't commands"""
+        try:
+            # Your existing image processing logic here
+            pass
+        except Exception as e:
+            self.logger.error(f"Image processing failed: {e}")
     async def emergency_shutdown(self):
         """Cleanup resources if initialization fails"""
         try:
