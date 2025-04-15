@@ -487,7 +487,7 @@ class MoodyBot(commands.Cog):
 
             # Get artworks matching ALL tags (for OR matching, you'd need to modify the query)
             artworks = await self.db.get_artworks_by_tag(
-                tags=tag_list,
+                tag=tag_list,
                 limit=per_page,
                 offset=offset,
                 match_all=True  # Assuming your method can handle this
