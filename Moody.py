@@ -186,6 +186,7 @@ class MoodyBot(commands.Cog):
             hex_colors = [color[0] for color in top_colors]
         
             # 4. Generate moodboard image
+            print (hex_colors)
             moodboard = self.generate_moodboard(hex_colors)
         
             # 5. Create embed
