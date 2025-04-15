@@ -165,27 +165,61 @@ class MoodyBot(commands.Cog):
     
     @commands.command(name='trend')
     async def show_theme_trends(self, ctx, *, theme: str):
-        """Show dominant color trends for a specific art theme"""
-        print ('Theme trends registered')
+        """Show color trends for a theme - DEBUGGED VERSION"""
         try:
-            # 1. Get top palettes for this theme from database
+            # 1. Get raw palette data
             theme_palettes = await self.db.get_theme_palettes(theme.lower())
-        
+            print(f"Raw palette data: {theme_palettes}")  # DEBUG
+            
             if not theme_palettes:
                 return await ctx.send(f"❌ No data found for '{theme}' theme")
-            print (theme_palettes)
-            # 2. Aggregate dominant colors across all artworks
+
+            # 2. Process colors - NEW SAFE VERSION
             color_stats = {}
             for palette in theme_palettes:
-                dominant_color = next((c for c in palette['colors'] if c['dominance_rank'] == 1), None)
-                if dominant_color:
-                    hex_code = dominant_color['hex_code']
-                    color_stats[hex_code] = color_stats.get(hex_code, 0) + 1
-            print (color_stats)
-            # 3. Get top 5 most frequent colors
+                # First check if palette is a dict with 'colors' key
+                if not isinstance(palette, dict):
+                    print(f"Skipping invalid palette (not dict): {palette}")  # DEBUG
+                    continue
+                    
+                # Get colors list - handle different possible structures
+                colors = palette.get('colors', []) if 'colors' in palette else palette
+                
+                # Ensure we have a list
+                if not isinstance(colors, list):
+                    colors = [colors]
+                
+                # Process each color
+                for color in colors:
+                    try:
+                        if not isinstance(color, dict):
+                            print(f"Skipping invalid color (not dict): {color}")  # DEBUG
+                            continue
+                            
+                        # Get dominance rank - handle different field names
+                        rank = color.get('dominance_rank', color.get('rank', 999))
+                        
+                        # Only count dominant colors (rank 1)
+                        if int(rank) == 1:
+                            hex_code = color.get('hex_code', color.get('hex', '#000000'))
+                            color_stats[hex_code] = color_stats.get(hex_code, 0) + 1
+                    except Exception as e:
+                        print(f"Error processing color: {color} - {e}")  # DEBUG
+                        continue
+
+            print(f"Color stats: {color_stats}")  # DEBUG
+            
+            if not color_stats:
+                return await ctx.send(f"❌ No dominant colors found for '{theme}'")
+
+            # 3. Get top colors
             top_colors = sorted(color_stats.items(), key=lambda x: x[1], reverse=True)[:5]
             hex_colors = [color[0] for color in top_colors]
-        
+            print(f"Top colors: {hex_colors}")  # DEBUG
+
+            # Rest of your image generation and embed code...
+            
+
             # 4. Generate moodboard image
             print (hex_colors)
             moodboard = self.generate_moodboard(hex_colors)
@@ -212,7 +246,7 @@ class MoodyBot(commands.Cog):
         
         except Exception as e:
             await ctx.send(f"❌ Error generating trends: {str(e)}")
-
+            
     def generate_moodboard(self, colors: list, width=600, height=300) -> io.BytesIO:
         """Generate a stylish moodboard image"""
         img = Image.new('RGB', (width, height))
