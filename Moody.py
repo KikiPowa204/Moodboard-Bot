@@ -205,7 +205,7 @@ class MoodyBot(commands.Cog):
                 return await ctx.send("❌ No palette found for this artwork!")
         
             # Generate and send palette
-            hex_colors = [color['hex_code'] for color in sorted(palette, key=lambda x: x['dominance_rank'])]
+            hex_colors = [color['hex_code'] for color in palette]
             image_buffer = self.generate_palette_image(hex_colors)
         
             embed = discord.Embed(
