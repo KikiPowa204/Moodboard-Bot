@@ -176,6 +176,25 @@ class MySQLStorage:
                 finally:
                     await cursor.execute("SET sql_notes = 1;")
 
+    async def get_artworks_with_artist_info(self, tag: str):
+        """Get artworks with joined artist information"""
+        async with self.pool.acquire() as conn:
+            async with conn.cursor(aiomysql.DictCursor) as cursor:
+                await cursor.execute("""
+                    SELECT 
+                        a.*,
+                        ar.artist_name,
+                        ar.social_media_link,
+                        GROUP_CONCAT(at.tag) as tags
+                    FROM artworks a
+                    JOIN artists ar ON a.artist_id = ar.id
+                    JOIN artwork_tags at ON a.id = at.artwork_id
+                    WHERE at.tag LIKE %s
+                    GROUP BY a.id
+                    LIMIT 25
+                """, (f"%{tag}%",))
+                return await cursor.fetchall()
+
     async def validate_connection(self) -> bool:
         """Test if the connection works"""
         if not self.pool:

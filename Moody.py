@@ -479,34 +479,37 @@ class MoodyBot(commands.Cog):
             if not tag:
                 return await ctx.send("Please provide a valid tag.")
 
-            artworks = await self.db.get_artworks_by_tag(tag)
+            # Get artworks with artist info included
+            artworks = await self.db.get_artworks_with_artist_info(tag)
             
             if not artworks:
                 return await ctx.send(f"No artworks found matching: {tag}")
 
             for art in artworks[:3]:  # Show first 3 results
-                # Verify image URL exists
-                if not art.get('image_url'):
-                    continue
-                    
                 embed = discord.Embed(
                     title=art.get('title', 'Untitled'),
                     color=0x6E85B2
                 )
-
-                embed.add_field(
-                    art['social_media_link']
-                )
-                # Set image as embed content (not thumbnail)
-                embed.set_image(url=art['image_url'])
-                embed.set_footer(text=f'Artwork ID: {art["id"]}')
-                # Add additional info
+                
+                # Set image
+                if art.get('image_url'):
+                    embed.set_image(url=art['image_url'])
+                
+                # Add artist info if available
+                if art.get('artist_name'):
+                    author_data = {"name": f"Artist: {art['artist_name']}"}
+                    if art.get('social_media_link'):
+                        author_data["url"] = art['social_media_link']
+                        author_data["icon_url"] = "https://cdn.discordapp.com/emojis/896043487135748106.png"  # Link icon
+                    embed.set_author(**author_data)
+                
+                # Add tags if available
                 if art.get('tags'):
                     embed.add_field(
                         name="Tags",
-                        value=", ".join(art['tags'].split(',')),
+                        value=", ".join(art['tags'].split(',')[:50],  # Limit to 50 chars
                         inline=False
-                    )
+                    ))
                 
                 await ctx.send(embed=embed)
 
