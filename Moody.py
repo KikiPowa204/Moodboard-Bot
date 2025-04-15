@@ -471,45 +471,45 @@ class MoodyBot(commands.Cog):
             self.logger.error(f"Cluster check failed: {e}")
             return False
 
-@commands.command(name='art')
-async def fetch_artwork(self, ctx, *, tag: str):
-    """Display artworks with embedded images matching the tag"""
-    try:
-        tag = tag.strip().lower()
-        if not tag:
-            return await ctx.send("Please provide a valid tag.")
+    @commands.command(name='art')
+    async def fetch_artwork(self, ctx, *, tag: str):
+        """Display artworks with embedded images matching the tag"""
+        try:
+            tag = tag.strip().lower()
+            if not tag:
+                return await ctx.send("Please provide a valid tag.")
 
-        artworks = await self.db.get_artworks_by_tag(tag)
-        
-        if not artworks:
-            return await ctx.send(f"No artworks found matching: {tag}")
+            artworks = await self.db.get_artworks_by_tag(tag)
+            
+            if not artworks:
+                return await ctx.send(f"No artworks found matching: {tag}")
 
-        for art in artworks[:3]:  # Show first 3 results
-            # Verify image URL exists
-            if not art.get('image_url'):
-                continue
-                
-            embed = discord.Embed(
-                title=art.get('title', 'Untitled'),
-                color=0x6E85B2
-            )
-            
-            # Set image as embed content (not thumbnail)
-            embed.set_image(url=art['image_url'])
-            
-            # Add additional info
-            if art.get('tags'):
-                embed.add_field(
-                    name="Tags",
-                    value=", ".join(art['tags'].split(',')),
-                    inline=False
+            for art in artworks[:3]:  # Show first 3 results
+                # Verify image URL exists
+                if not art.get('image_url'):
+                    continue
+                    
+                embed = discord.Embed(
+                    title=art.get('title', 'Untitled'),
+                    color=0x6E85B2
                 )
-            
-            await ctx.send(embed=embed)
+                
+                # Set image as embed content (not thumbnail)
+                embed.set_image(url=art['image_url'])
+                
+                # Add additional info
+                if art.get('tags'):
+                    embed.add_field(
+                        name="Tags",
+                        value=", ".join(art['tags'].split(',')),
+                        inline=False
+                    )
+                
+                await ctx.send(embed=embed)
 
-    except Exception as e:
-        await ctx.send(f"Error displaying artwork: {str(e)}")
-        self.logger.error(f"Embed error: {e}", exc_info=True)
+        except Exception as e:
+            await ctx.send(f"Error displaying artwork: {str(e)}")
+            self.logger.error(f"Embed error: {e}", exc_info=True)
 
     @commands.command(name='overlap')
     async def show_palette_overlap(self, ctx, *, theme: str):
