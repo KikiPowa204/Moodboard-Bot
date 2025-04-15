@@ -224,7 +224,9 @@ class MoodyBot(commands.Cog):
                 for color in artwork['colors']:
                     try:
                         # FIXED: Proper float conversion
-                        delta_e = float(delta_e_cie2000(reference_color, color['lab']))
+                        lab1 = (reference_color.lab_l, reference_color.lab_a, reference_color.lab_b)
+                        lab2 = (color['lab'].lab_l, color['lab'].lab_a, color['lab'].lab_b)
+                        delta_e = delta_e_cie2000(lab1, lab2)
                         similarity = max(0, 100 - delta_e)
                         score += similarity * (1/color['dominance'])
                         best_matches.append({
