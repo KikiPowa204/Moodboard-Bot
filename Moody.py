@@ -13,7 +13,7 @@ from lib.database import MySQLStorage
 from lib.analyser import ColorAnalyser
 # In Moody.py
 from discord.ext import commands
-import math
+import random
 import discord
 import logging
 import aiohttp
@@ -149,6 +149,83 @@ class MoodyBot(commands.Cog):
         except Exception as e:
             self.logger.error(f"Submission error: {e}", exc_info=True)
             await ctx.send(f"⚠️ Submission failed: {str(e)}")
+    
+    @commands.command(name='trend')
+    async def show_theme_trends(self, ctx, *, theme: str):
+        """Show dominant color trends for a specific art theme"""
+        try:
+            # 1. Get top palettes for this theme from database
+            theme_palettes = await self.db.get_theme_palettes(theme.lower())
+        
+            if not theme_palettes:
+                return await ctx.send(f"❌ No data found for '{theme}' theme")
+        
+            # 2. Aggregate dominant colors across all artworks
+            color_stats = {}
+            for palette in theme_palettes:
+                dominant_color = next((c for c in palette['colors'] if c['dominance_rank'] == 1), None)
+                if dominant_color:
+                    hex_code = dominant_color['hex_code']
+                    color_stats[hex_code] = color_stats.get(hex_code, 0) + 1
+        
+            # 3. Get top 5 most frequent colors
+            top_colors = sorted(color_stats.items(), key=lambda x: x[1], reverse=True)[:5]
+            hex_colors = [color[0] for color in top_colors]
+        
+            # 4. Generate moodboard image
+            moodboard = self.generate_moodboard(hex_colors)
+        
+            # 5. Create embed
+            embed = discord.Embed(
+                title=f"🎨 Color Trends for '{theme.title()}'",
+                description=f"Based on {len(theme_palettes)} artworks",
+                color=int(hex_colors[0].lstrip('#'), 16)
+            )
+        
+            file = discord.File(moodboard, filename="moodboard.png")
+            embed.set_image(url="attachment://moodboard.png")
+        
+            for i, (hex_code, count) in enumerate(top_colors, 1):
+                percentage = (count / len(theme_palettes)) * 100
+                embed.add_field(
+                    name=f"#{i} {hex_code}",
+                    value=f"Appears in {percentage:.1f}% of artworks",
+                    inline=True
+                )
+        
+            await ctx.send(file=file, embed=embed)
+        
+        except Exception as e:
+            await ctx.send(f"❌ Error generating trends: {str(e)}")
+
+    def generate_moodboard(self, colors: list, width=600, height=300) -> io.BytesIO:
+        """Generate a stylish moodboard image"""
+        img = Image.new('RGB', (width, height))
+        draw = ImageDraw.Draw(img)
+    
+        # Create gradient blocks
+        block_width = width // len(colors)
+        for i, hex_color in enumerate(colors):
+            x0 = i * block_width
+            x1 = x0 + block_width
+        
+            # Base color
+            rgb = tuple(int(hex_color.lstrip('#')[i:i+2], 16) for i in (0, 2, 4))
+            draw.rectangle([x0, 0, x1, height], fill=rgb)
+        
+            # Add texture/noise for visual interest
+            for _ in range(100):
+                xy = (random.randint(x0, x1), random.randint(0, height))
+                draw.point(xy, fill=self._adjust_brightness(rgb, random.uniform(0.9, 1.1)))
+    
+        buffer = io.BytesIO()
+        img.save(buffer, format='PNG')
+        buffer.seek(0)
+        return buffer
+
+    def _adjust_brightness(self, rgb, factor):
+        """Helper for moodboard texture"""
+        return tuple((min(255, max(0, int(c * factor))) for c in rgb))
     
     def generate_palette_image(self, colors: list, width=400, height=100) -> io.BytesIO:
         """

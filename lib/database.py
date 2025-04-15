@@ -351,6 +351,19 @@ class MySQLStorage:
             return (rank, -coverage)  # Negative for descending coverage
     
         return sorted(palette, key=sort_key)
+    async def get_theme_palettes(self, theme: str) -> list:
+        """Get all palettes for artworks with matching tags"""
+        async with self.pool.acquire() as conn:
+            async with conn.cursor() as cursor:
+                await cursor.execute("""
+                    SELECT cp.* 
+                    FROM color_palettes cp
+                    JOIN artwork_tags at ON cp.artwork_id = at.artwork_id
+                    WHERE at.tag LIKE %s
+                    ORDER BY cp.dominance_rank
+                """, (f"%{theme}%",))
+                return await cursor.fetchall()
+    
     async def get_artwork_palette(self, artwork_id: int):
         """Get palette with guaranteed sorting"""
         query = '''
