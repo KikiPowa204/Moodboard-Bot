@@ -471,99 +471,45 @@ class MoodyBot(commands.Cog):
             self.logger.error(f"Cluster check failed: {e}")
             return False
 
-    @commands.command(name='art')
-    async def fetch_artwork(self, ctx, *, tag: str):
-        """Display artworks matching the given tag (supports partial matching)"""
-        try:
-            # Clean the tag input
-            tag = tag.strip().lower()
-            if not tag:
-                return await ctx.send("Please provide a valid tag.")
+@commands.command(name='art')
+async def fetch_artwork(self, ctx, *, tag: str):
+    """Display artworks with embedded images matching the tag"""
+    try:
+        tag = tag.strip().lower()
+        if not tag:
+            return await ctx.send("Please provide a valid tag.")
 
-            # Get artworks with this tag (using the LIKE operator for partial matches)
-            artworks = await self.db.get_artworks_by_tag(tag)
+        artworks = await self.db.get_artworks_by_tag(tag)
+        
+        if not artworks:
+            return await ctx.send(f"No artworks found matching: {tag}")
 
-            if not artworks:
-                return await ctx.send(f"No artworks found with tag matching: {tag}")
-
-            # Client-side pagination
-            per_page = 3  # Number of artworks to show per message
-            pages = [artworks[i:i + per_page] for i in range(0, len(artworks), per_page)]
-            current_page = 0
-
-            def create_embed(page_num):
-                embed = discord.Embed(
-                    title=f"Artworks matching: {tag}",
-                    description=f"Page {page_num + 1}/{len(pages)}",
-                    color=0x6E85B2
-                )
+        for art in artworks[:3]:  # Show first 3 results
+            # Verify image URL exists
+            if not art.get('image_url'):
+                continue
                 
-                for art in pages[page_num]:
-                    # Parse the concatenated tags
-                    all_tags = art.get('tags', '').split(',') if art.get('tags') else []
-                    
-                    # Parse the color palette
-                    palette = []
-                    if art.get('palette'):
-                        palette = [color.split('|') for color in art['palette'].split(',')]
-                        palette.sort(key=lambda x: int(x[1]))  # Sort by dominance_rank
-                    
-                    # Add artwork fields
-                    value = f"**Artist:** {art.get('artist_name', 'Unknown')}\n"
-                    if all_tags:
-                        value += f"**Tags:** {', '.join(all_tags)}\n"
-                    if palette:
-                        color_blocks = ' '.join([f"`{c[0]}`" for c in palette[:5]])
-                        value += f"**Colors:** {color_blocks}"
-                    
-                    embed.add_field(
-                        name=art.get('title', 'Untitled'),
-                        value=value,
-                        inline=False
-                    )
-                    
-                    # Use first artwork's image as embed thumbnail
-                    if art.get('image_url') and not embed.thumbnail:
-                        embed.set_thumbnail(url=art['image_url'])
-                
-                embed.set_footer(text=f"Found {len(artworks)} artworks • Use reactions to navigate")
-                return embed
-
-            message = await ctx.send(embed=create_embed(current_page))
+            embed = discord.Embed(
+                title=art.get('title', 'Untitled'),
+                color=0x6E85B2
+            )
             
-            # Add pagination controls if multiple pages exist
-            if len(pages) > 1:
-                await message.add_reaction("⬅️")
-                await message.add_reaction("➡️")
-                
-                def check(reaction, user):
-                    return (user == ctx.author and 
-                            reaction.message.id == message.id and 
-                            str(reaction.emoji) in ["⬅️", "➡️"])
-                
-                while True:
-                    try:
-                        reaction, user = await self.bot.wait_for(
-                            "reaction_add", 
-                            timeout=60.0, 
-                            check=check
-                        )
-                        
-                        if str(reaction.emoji) == "➡️" and current_page < len(pages) - 1:
-                            current_page += 1
-                        elif str(reaction.emoji) == "⬅️" and current_page > 0:
-                            current_page -= 1
-                        
-                        await message.edit(embed=create_embed(current_page))
-                        await message.remove_reaction(reaction, user)
-                        
-                    except asyncio.TimeoutError:
-                        await message.clear_reactions()
-                        break
+            # Set image as embed content (not thumbnail)
+            embed.set_image(url=art['image_url'])
+            
+            # Add additional info
+            if art.get('tags'):
+                embed.add_field(
+                    name="Tags",
+                    value=", ".join(art['tags'].split(',')),
+                    inline=False
+                )
+            
+            await ctx.send(embed=embed)
 
-        except Exception as e:
-            await ctx.send(f"🚨 Error fetching artworks: {str(e)}")
-            self.logger.error(f"Fetch artwork error: {e}", exc_info=True)
+    except Exception as e:
+        await ctx.send(f"Error displaying artwork: {str(e)}")
+        self.logger.error(f"Embed error: {e}", exc_info=True)
 
     @commands.command(name='overlap')
     async def show_palette_overlap(self, ctx, *, theme: str):
