@@ -430,7 +430,7 @@ class MoodyBot(commands.Cog):
     def _hex_to_lab(self, hex_color):
         """Convert hex color to LAB space (simplified version)"""
         rgb = tuple(int(hex_color.lstrip('#')[i:i+2], 16) for i in (0, 2, 4))
-        return self._rgb_to_lab(rgb)
+        return delta_e_cie2000(rgb)
 
     async def _generate_overlap_comparison(self, artworks, clusters):
         """Generate visual comparison of palette overlaps"""
