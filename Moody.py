@@ -387,9 +387,9 @@ class MoodyBot(commands.Cog):
             lab1 = self._hex_to_lab(hex1)
             lab2 = self._hex_to_lab(hex2)
             return delta_e_cie2000(
-                LabColor(*self._get_lab_values(lab1)),
-                LabColor(*self._get_lab_values(lab2))
-            )
+                self._get_lab_values(lab1),
+                self._get_lab_values(lab2)
+        )
         except Exception as e:
             self.logger.error(f"Delta-E calculation failed: {e}")
             return 100.0  # Max difference on error
