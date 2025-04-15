@@ -323,31 +323,29 @@ class MySQLStorage:
             async with conn.cursor() as cursor:
                 await cursor.executemany(query, palette_data)
                 await conn.commit()
-    async def get_artwork_palette(self, artwork_id: int) -> List[Dict]:
-        """More robust version with validation"""
-        if not isinstance(artwork_id, int) or artwork_id < 1:
-            raise ValueError("Invalid artwork ID")
-    
+    async def get_artwork_palette(self, artwork_id: int) -> List[Dict[str, any]]:
+        """Retrieve and properly format color palette"""
         query = '''
             SELECT 
                 hex_code, 
-                dominance_rank, 
-                ROUND(coverage, 2) as coverage
+                CAST(dominance_rank AS SIGNED) as dominance_rank,
+                CAST(coverage AS DECIMAL(5,2)) as coverage
             FROM color_palettes
             WHERE artwork_id = %s
-            ORDER BY dominance_rank
+            ORDER BY dominance_rank ASC
         '''
     
-        try:
-            async with self.pool.acquire() as conn:
-                async with conn.cursor(aiomysql.DictCursor) as cursor:
-                    await cursor.execute(query, (artwork_id,))
-                    return await cursor.fetchall() or []
+        async with self.pool.acquire() as conn:
+            async with conn.cursor(aiomysql.DictCursor) as cursor:
+                await cursor.execute(query, (artwork_id,))
+                palette = await cursor.fetchall()
+            
+                # Ensure proper numeric types
+                for color in palette:
+                    color['dominance_rank'] = int(color['dominance_rank'])
+                    color['coverage'] = float(color['coverage']) if color['coverage'] is not None else 0.0
                 
-        except Exception as e:
-            self.logger.error(f"Failed to fetch palette: {e}")
-            return []
-
+                return palette
     async def close(self) -> None:
         """Cleanup resources when stopping"""
         if self.pool:
