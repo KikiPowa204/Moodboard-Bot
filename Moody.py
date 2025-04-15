@@ -309,123 +309,6 @@ class MoodyBot(commands.Cog):
             )
         
         await ctx.send(file=discord.File(buffer, "trend.png"), embed=embed)
-    @commands.command(name='paletteoverlap')
-    async def show_palette_overlap(self, ctx, *, theme: str):
-        """Show artworks with most consistent color palette overlaps"""
-        try:
-            # 1. Get all artworks with the theme tag
-            theme_artworks = await self.db.get_artworks_by_tag(theme.lower())
-            if not theme_artworks:
-                return await ctx.send(f"❌ No artworks found with '{theme}' tag")
-
-            # 2. Extract and cluster color palettes
-            color_clusters = await self._cluster_artwork_colors(theme_artworks)
-            
-            if not color_clusters:
-                return await ctx.send(f"❌ No consistent color patterns found for '{theme}'")
-
-            # 3. Find artworks with most cluster matches
-            matched_artworks = []
-            for artwork in theme_artworks:
-                palette = await self.db.get_artwork_palette(artwork['id'])
-                if not palette:
-                    continue
-                
-                match_score = 0
-                for color in palette:
-                    for cluster in color_clusters:
-                        hex_code = color['hex_code']
-                        if self._color_in_cluster(hex_code, cluster):
-                            match_score += 1
-                            break
-                
-                if match_score > 0:
-                    matched_artworks.append({
-                        'artwork': artwork,
-                        'score': match_score,
-                        'matched_colors': [c['hex_code'] for c in palette 
-                                        if any(self._color_in_cluster(c['hex_code'], cluster) 
-                                        for cluster in color_clusters)]
-                    })
-
-            if not matched_artworks:
-                return await ctx.send("❌ No artworks matched the color clusters")
-
-            # 4. Sort by most matches and get top 5
-            top_artworks = sorted(matched_artworks, key=lambda x: x['score'], reverse=True)[:5]
-            
-            # 5. Generate visual comparison
-            comparison_image = await self._generate_overlap_comparison(top_artworks, color_clusters)
-            file = discord.File(comparison_image, filename="palette_overlap.png")
-
-            # 6. Create embed
-            embed = discord.Embed(
-                title=f"🎨 Consistent Color Overlaps in '{theme}'",
-                description=f"Top {len(top_artworks)} artworks sharing color patterns",
-                color=0x6E85B2
-            )
-            
-            # Add cluster info
-            for i, cluster in enumerate(color_clusters[:3], 1):
-                embed.add_field(
-                    name=f"Color Group #{i}",
-                    value="\n".join(cluster['representative_colors'][:3]),
-                    inline=True
-                )
-
-            embed.set_image(url="attachment://palette_overlap.png")
-            await ctx.send(file=file, embed=embed)
-
-        except Exception as e:
-            await ctx.send(f"❌ Error: {str(e)}")
-            self.logger.error(f"Overlap error: {traceback.format_exc()}")
-
-    async def _cluster_artwork_colors(self, artworks, n_clusters=5):
-        """Cluster colors from all artworks to find common patterns"""
-        
-        # 1. Collect all dominant colors
-        all_colors = []
-        for artwork in artworks:
-            palette = await self.db.get_artwork_palette(artwork['id'])
-            if palette:
-                # Get top 3 dominant colors per artwork
-                dominant = sorted(palette, key=lambda x: x['dominance_rank'])[:3]
-                all_colors.extend([color['hex_code'] for color in dominant])
-        
-        if len(all_colors) < n_clusters:
-            return []
-
-        # 2. Convert hex colors to LAB space for clustering
-        lab_colors = np.array([self._hex_to_lab(hex_color) for hex_color in all_colors])
-        
-        # 3. Perform k-means clustering
-        kmeans = KMeans(n_clusters=n_clusters, random_state=42)
-        clusters = kmeans.fit_predict(lab_colors)
-        
-        # 4. Build cluster info
-        color_clusters = []
-        for i in range(n_clusters):
-            cluster_colors = [all_colors[j] for j in range(len(all_colors)) if clusters[j] == i]
-            if cluster_colors:
-                # Get most frequent colors in cluster
-                from collections import Counter
-                common_colors = Counter(cluster_colors).most_common(5)
-                
-                color_clusters.append({
-                    'center': kmeans.cluster_centers_[i].tolist(),
-                    'representative_colors': [color[0] for color in common_colors],
-                    'size': len(cluster_colors)
-                })
-        
-        # Sort by cluster size (most common patterns first)
-        return sorted(color_clusters, key=lambda x: x['size'], reverse=True)
-
-    def _color_in_cluster(self, hex_color, cluster, threshold=15.0):
-        """Check if a color belongs to a cluster within threshold ΔE"""
-        color_lab = self._hex_to_lab(hex_color)
-        cluster_center = cluster['center']
-        delta_e = delta_e_cie2000(color_lab, cluster_center)
-        return delta_e < threshold
 
     def _hex_to_lab(self, hex_color):
         """Convert hex color to LAB color space"""
@@ -527,7 +410,7 @@ class MoodyBot(commands.Cog):
             self.logger.error(f"Cluster check failed: {e}")
             return False
 
-    @commands.command(name='paletteoverlap')
+    @commands.command(name='overlap')
     async def show_palette_overlap(self, ctx, *, theme: str):
         """Show artworks with consistent color palette overlaps"""
         try:
