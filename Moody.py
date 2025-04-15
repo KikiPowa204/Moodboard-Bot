@@ -501,7 +501,7 @@ class MoodyBot(commands.Cog):
                         author_data["url"] = art['social_media_link']
                         author_data["icon_url"] = "https://cdn.discordapp.com/emojis/896043487135748106.png"  # Link icon
                     embed.set_author(**author_data)
-                
+                embed.set_footer(text=f'Artwork ID: {art["id"]}')
                 # Add tags if available - FIXED THIS SECTION
                 if art.get('tags'):
                     tags_list = art['tags'].split(',')[:50]  # First limit the list
