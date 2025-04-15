@@ -373,7 +373,7 @@ class MySQLStorage:
                         'coverage': color.get('coverage')
                     })
             
-                return validated
+                return self.safe_sort_palette(validated)
     async def close(self) -> None:
         """Cleanup resources when stopping"""
         if self.pool:

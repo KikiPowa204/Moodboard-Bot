@@ -156,6 +156,7 @@ class MoodyBot(commands.Cog):
         :param colors: List of hex color codes (e.g., ["#FF5733", "#33FF57"])
         :return: BytesIO buffer containing PNG image
         """
+        print (f'in generate_palette_image {colors}')
         try:
             # Create blank image
             img = Image.new('RGB', (width, height))
