@@ -472,43 +472,39 @@ class MoodyBot(commands.Cog):
             return False
 
     @commands.command(name='art')
-    async def fetch_artwork(self, ctx, *, tags: str):
-        """Display artworks matching the given tags (comma-separated)"""
+    async def fetch_artwork(self, ctx, *, tag: str):
+        """Display artworks matching the given tag"""
         try:
             per_page = 5
-            page = 1  # Could be made into a parameter later
-            offset = (page - 1) * per_page
-
-            # Split and clean tags
-            tag_list = [tag.strip().lower() for tag in tags.split(',') if tag.strip()]
+            page = 1  # Default page (could make this a parameter later)
             
-            if not tag_list:
-                return await ctx.send("Please provide at least one valid tag.")
+            # Clean the tag input
+            tag = tag.strip().lower()
+            if not tag:
+                return await ctx.send("Please provide a valid tag.")
 
-            # Get artworks matching ALL tags (for OR matching, you'd need to modify the query)
+            # Get artworks by single tag
             artworks = await self.db.get_artworks_by_tag(
-                tag=tag_list)
+                tag=tag,
+                limit=per_page,
+                offset=(page - 1) * per_page
+            )
 
             if not artworks:
-                return await ctx.send(f"No artworks found matching all tags: {', '.join(tag_list)}")
+                return await ctx.send(f"No artworks found with tag: {tag}")
 
             for art in artworks:
                 # Get artist info
                 artist = await self.db.get_artist_by_id(art['artist_id'])
                 
-                # Get all tags for this artwork (not just the search tags)
+                # Get all tags for this artwork
                 artwork_tags = await self.db.get_artwork_tags(art['id'])
-                
-                # Get submitter info if available
-                submitter = await self.db.get_submitter_by_id(art['submitter_id'])
-                
-                # Get color palette if available
-                colors = await self.db.get_colors_for_artwork(art['id'])
                 
                 # Create embed
                 embed = discord.Embed(
                     title=art.get('title', 'Untitled'),
-                    description=art.get('description', 'No description')[:200] + ('...' if len(art.get('description', '')) > 200 else ''),
+                    description=art.get('description', 'No description')[:200] + 
+                        ('...' if len(art.get('description', '')) > 200 else ''),
                     color=0x6E85B2,
                     timestamp=art['created_at']
                 )
@@ -518,25 +514,7 @@ class MoodyBot(commands.Cog):
                 if artist:
                     embed.set_author(
                         name=artist['artist_name'],
-                        url=artist.get('social_media_link', ''),
-                        icon_url="https://cdn.discordapp.com/emojis/896043487135748106.png"  # Example palette icon
-                    )
-                
-                # Add submitter info if available
-                if submitter:
-                    embed.add_field(
-                        name="Submitted by",
-                        value=submitter['name'],
-                        inline=True
-                    )
-                
-                # Add color palette if available
-                if colors:
-                    color_display = " ".join([f"`{c['hex_code']}`" for c in colors[:5]])
-                    embed.add_field(
-                        name="Color Palette",
-                        value=color_display,
-                        inline=False
+                        url=artist.get('social_media_link', '')
                     )
                 
                 # Add all tags
@@ -552,7 +530,7 @@ class MoodyBot(commands.Cog):
 
         except Exception as e:
             await ctx.send(f"🚨 Error fetching artworks: {str(e)}")
-            self.logger.error(f"Fetch artwork error: {e}", exc_info=True)    
+            self.logger.error(f"Fetch artwork error: {e}", exc_info=True)
 
     @commands.command(name='overlap')
     async def show_palette_overlap(self, ctx, *, theme: str):
