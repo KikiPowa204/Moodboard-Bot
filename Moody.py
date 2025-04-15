@@ -491,8 +491,13 @@ class MoodyBot(commands.Cog):
                     
                 embed = discord.Embed(
                     title=art.get('title', 'Untitled'),
-                    socials=art.get('social_media_link'),
                     color=0x6E85B2
+                )
+            if art.get('social_media_link'):
+                embed.set_author(
+                    name="Artist Socials",
+                    icon_url="🔗",  # Link emoji as icon
+                    url=art['social_media_link']
                 )
                 # Set image as embed content (not thumbnail)
                 embed.set_image(url=art['image_url'])
