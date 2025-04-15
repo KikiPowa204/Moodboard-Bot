@@ -166,6 +166,7 @@ class MoodyBot(commands.Cog):
     @commands.command(name='trend')
     async def show_theme_trends(self, ctx, *, theme: str):
         """Show dominant color trends for a specific art theme"""
+        print ('Theme trends registered')
         try:
             # 1. Get top palettes for this theme from database
             theme_palettes = await self.db.get_theme_palettes(theme.lower())
