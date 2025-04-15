@@ -309,7 +309,64 @@ class MoodyBot(commands.Cog):
             )
         
         await ctx.send(file=discord.File(buffer, "trend.png"), embed=embed)
+    async def _generate_overlap_visualization(self, artworks, clusters):
+        """Generate color overlap visualization"""
+        from matplotlib import pyplot as plt
+        
+        fig, ax = plt.subplots(figsize=(12, 8))
+        
+        # Plot clusters
+        for i, cluster in enumerate(clusters[:5]):
+            ax.scatter(
+                i, 1,
+                color=cluster['representative'],
+                s=500,
+                label=f"Group {i+1}"
+            )
+        
+        # Plot artworks
+        for i, artwork in enumerate(artworks[:5]):
+            img = await self._download_image(artwork['artwork']['image_url'], (200, 200))
+            ax.imshow(
+                img,
+                extent=(i-0.4, i+0.4, 0, 0.8),
+                zorder=0
+            )
+            
+            # Draw connection lines
+            for color in artwork['matched_colors'][:3]:
+                for j, cluster in enumerate(clusters[:5]):
+                    if self._color_in_cluster(color, cluster):
+                        ax.plot(
+                            [i, j],
+                            [0.8, 1],
+                            color=color,
+                            alpha=0.6,
+                            linewidth=2
+                        )
+                        break
+        
+        ax.set_xlim(-0.5, max(4.5, len(artworks)-0.5))
+        ax.set_ylim(-0.1, 1.5)
+        ax.axis('off')
+        ax.legend(loc='upper center', ncol=5)
+        
+        buffer = io.BytesIO()
+        plt.savefig(buffer, format='png', bbox_inches='tight', dpi=120)
+        plt.close()
+        buffer.seek(0)
+        return buffer
 
+    async def _download_image(self, url, size=None):
+        """Download and optionally resize image"""
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url) as response:
+                img_data = await response.read()
+        
+        img = Image.open(io.BytesIO(img_data))
+        if size:
+            img.thumbnail(size)
+        return img
     def _hex_to_lab(self, hex_color):
         """Convert hex color to LAB color space"""
         try:
@@ -401,11 +458,15 @@ class MoodyBot(commands.Cog):
         """Check if color belongs to a cluster"""
         try:
             color_lab = self._hex_to_lab(hex_color)
-            delta_e = delta_e_cie2000(
-                color_lab,
-                cluster['center']
-            )
+            center_lab = cluster['center']
+
+            # Convert LabColor objects to (L, a, b) tuples
+            lab1 = self._get_lab_values(color_lab)
+            lab2 = self._get_lab_values(center_lab)
+
+            delta_e = delta_e_cie2000(lab1, lab2)
             return delta_e < threshold
+
         except Exception as e:
             self.logger.error(f"Cluster check failed: {e}")
             return False
