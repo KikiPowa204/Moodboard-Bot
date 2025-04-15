@@ -329,6 +329,17 @@ class MySQLStorage:
             async with conn.cursor() as cursor:
                 await cursor.executemany(query, palette_data)
                 await conn.commit()
+    async def get_artwork_tags(self, artwork_id: int) -> List[str]:
+        """Get all tags for a specific artwork"""
+        async with self.pool.acquire() as conn:
+            async with conn.cursor() as cursor:
+                await cursor.execute(
+                    "SELECT tag FROM artwork_tags WHERE artwork_id = %s",
+                    (artwork_id,)
+                )
+                tags = await cursor.fetchall()
+                return [tag['tag'] for tag in tags]
+
     async def get_artwork_palette(self, artwork_id: int):
         """Get palette with nuclear-grade type validation"""
         print (f'In get_artwork_palette. Artwork_ID: {artwork_id}')

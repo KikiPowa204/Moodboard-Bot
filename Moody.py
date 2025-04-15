@@ -231,26 +231,20 @@ class MoodyBot(commands.Cog):
         
         except Exception as e:
             await ctx.send(f"❌ Error generating palette: {str(e)}")
-    @commands.command(name='artist')
-    async def artworks(self, ctx, artist_name: str, page: int = 1):
-        """View submitted artworks by an artist
-        Usage: !display <artist_name> [page=1]
-        """
+    @commands.command(name='artworks')
+    async def show_artworks(self, ctx, artist_name: str, page: int = 1):
+        """Display artworks with their tags"""
         try:
-            # Validate page number
-            if page < 1:
-                return await ctx.send("❌ Page number must be 1 or greater")
-
             per_page = 5
             offset = (page - 1) * per_page
 
-            # Get or create artist
+            # Get artist
             artist = await self.db.get_or_create_artist(
                 artist_name=artist_name,
-                social_media_link=""  # Provide empty if not needed
+                social_media_link=""
             )
 
-            # Fetch artworks from database
+            # Get artworks
             artworks = await self.db.get_artworks_by_artist(
                 artist_id=artist['id'],
                 limit=per_page,
@@ -260,32 +254,32 @@ class MoodyBot(commands.Cog):
             if not artworks:
                 return await ctx.send(f"No artworks found for {artist_name}")
 
-            # Create embed
-            embed = discord.Embed(
-                title=f"Artworks by {artist_name} (Page {page})",
-                color=0x6E85B2
-            )
-
             for art in artworks:
+                # Fetch tags for this artwork
+                tags = await self.db.get_artwork_tags(art['id'])
+            
+                # Create embed
                 embed = discord.Embed(
                     title=art.get('title', 'Untitled'),
-                    description=art.get('description', 'No description')[:50] + '...',
+                    description=art.get('description', 'No description')[:100] + '...',
                     color=0x6E85B2
-            )
-                embed.set_image(url=art['image_url'])
-    
-    # Safely handle tags
-                tags = art.get('tags', '') or art.get('tag', '')  # Try both possible field names
-                embed.add_field(
-                    name="Tags",
-                    value=", ".join(tags.split(',')) if tags else "None",
-                    inline=False
                 )
-    
-                embed.set_footer(text=f'Artwork ID: {art["id"]}')
+                embed.set_image(url=art['image_url'])
+            
+                # Add tags if they exist
+                if tags:
+                    embed.add_field(
+                        name="Tags",
+                        value=", ".join(tags),
+                        inline=False
+                    )
+            
+                embed.set_footer(text=f'Artwork ID: {art["id"]} | Page {page}')
                 await ctx.send(embed=embed)
+
         except Exception as e:
-            raise
+            await ctx.send(f"Error displaying artworks: {str(e)}")
+            self.logger.error(f"Artworks error: {e}", exc_info=True)
 
 async def main():
     try:
