@@ -470,7 +470,6 @@ class MoodyBot(commands.Cog):
         except Exception as e:
             self.logger.error(f"Cluster check failed: {e}")
             return False
-
     @commands.command(name='art')
     async def fetch_artwork(self, ctx, *, tag: str):
         """Display artworks with embedded images matching the tag"""
@@ -503,13 +502,14 @@ class MoodyBot(commands.Cog):
                         author_data["icon_url"] = "https://cdn.discordapp.com/emojis/896043487135748106.png"  # Link icon
                     embed.set_author(**author_data)
                 
-                # Add tags if available
+                # Add tags if available - FIXED THIS SECTION
                 if art.get('tags'):
+                    tags_list = art['tags'].split(',')[:50]  # First limit the list
                     embed.add_field(
                         name="Tags",
-                        value=", ".join(art['tags'].split(',')[:50],  # Limit to 50 chars
+                        value=", ".join(tags_list),  # Then join without length parameter
                         inline=False
-                    ))
+                    )
                 
                 await ctx.send(embed=embed)
 
