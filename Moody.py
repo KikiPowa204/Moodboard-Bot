@@ -486,7 +486,7 @@ class MoodyBot(commands.Cog):
                 return await ctx.send("Please provide at least one valid tag.")
 
             # Get artworks matching ALL tags (for OR matching, you'd need to modify the query)
-            artworks = await self.db.get_artworks_by_tags(
+            artworks = await self.db.get_artworks_by_tag(
                 tags=tag_list,
                 limit=per_page,
                 offset=offset,
