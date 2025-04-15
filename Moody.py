@@ -21,7 +21,7 @@ import aiohttp
 import traceback
 from colormath.color_objects import LabColor, sRGBColor
 from colormath.color_conversions import convert_color
-from colormath.color_diff import delta_e_cie2000
+import _delta_e
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -224,7 +224,7 @@ class MoodyBot(commands.Cog):
                 for color in artwork['colors']:
                     try:
                         # FIXED: Proper float conversion
-                        delta_e = float(delta_e_cie2000(reference_color, color['lab']))
+                        delta_e = float(_delta_e(reference_color, color['lab']))
                         similarity = max(0, 100 - delta_e)
                         score += similarity * (1/color['dominance'])
                         best_matches.append({
