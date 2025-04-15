@@ -267,19 +267,25 @@ class MoodyBot(commands.Cog):
             )
 
             for art in artworks:
+                embed = discord.Embed(
+                    title=art.get('title', 'Untitled'),
+                    description=art.get('description', 'No description')[:50] + '...',
+                    color=0x6E85B2
+            )
+                embed.set_image(url=art['image_url'])
+    
+    # Safely handle tags
+                tags = art.get('tags', '') or art.get('tag', '')  # Try both possible field names
                 embed.add_field(
-                    name=art['title'],
-                    value=f"{art['description'][:50]}...",
+                    name="Tags",
+                    value=", ".join(tags.split(',')) if tags else "None",
                     inline=False
                 )
-                embed.set_image(url=art['image_url'])
-                embed.add_field(name="Tags", value=", ".join(art['tag']) if art['tag'] else "None")
-                embed.set_footer(text=f'Artwork ID: {art['id']}')
-                await ctx.send(embed=embed)    
-            
+    
+                embed.set_footer(text=f'Artwork ID: {art["id"]}')
+                await ctx.send(embed=embed)
         except Exception as e:
-            self.logger.error(f"Display error: {e}", exc_info=True)
-            await ctx.send("⚠️ Failed to fetch artworks")
+            raise
 
 async def main():
     try:
