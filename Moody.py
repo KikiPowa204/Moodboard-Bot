@@ -126,8 +126,9 @@ class MoodyBot(commands.Cog):
         # 4. Extract and store colors
             try:
                 colors = await self.analyzer.extract_palettes(image_url)
+                print (colors)
                 await self.db.store_palette(
-                artwork_id=artwork['id'],
+                artwork_id=artwork,
                 colors=colors
             )
             except Exception as e:
