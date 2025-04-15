@@ -172,7 +172,7 @@ class MoodyBot(commands.Cog):
         
             if not theme_palettes:
                 return await ctx.send(f"❌ No data found for '{theme}' theme")
-        
+            print (theme_palettes)
             # 2. Aggregate dominant colors across all artworks
             color_stats = {}
             for palette in theme_palettes:
