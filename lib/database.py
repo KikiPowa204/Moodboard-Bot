@@ -323,7 +323,7 @@ class MySQLStorage:
             async with conn.cursor() as cursor:
                 await cursor.executemany(query, palette_data)
                 await conn.commit()
-    async def get_artwork_palette(self, artwork_id: int) -> List[Dict[str, any]]:
+    async def get_artwork_palette(self, artwork_id: int):
         """Retrieve and properly format color palette"""
         query = '''
             SELECT 
