@@ -1,7 +1,9 @@
 from colorthief import ColorThief
 import discord
 import io
+from PIL import ImageDraw, Image
 import logging
+import re
 import os
 import asyncio
 from typing import Optional
@@ -150,7 +152,84 @@ class MoodyBot(commands.Cog):
         except Exception as e:
             self.logger.error(f"Submission error: {e}", exc_info=True)
             await ctx.send(f"⚠️ Submission failed: {str(e)}")
-
+    
+    def generate_palette_image(colors: list, width=400, height=100) -> io.BytesIO:
+        """
+        Generate a color palette image
+        :param colors: List of hex color codes (e.g., ["#FF5733", "#33FF57"])
+        :return: BytesIO buffer containing PNG image
+        """
+        # Create blank image
+        img = Image.new('RGB', (width, height))
+        draw = ImageDraw.Draw(img)
+    
+        # Calculate color block widths
+        block_width = width // len(colors)
+    
+        # Draw each color
+        for i, hex_color in enumerate(colors):
+            x0 = i * block_width
+            x1 = x0 + block_width
+            rgb = tuple(int(hex_color.lstrip('#')[i:i+2], 16) for i in (0, 2, 4))
+            draw.rectangle([x0, 0, x1, height], fill=rgb)
+    
+        # Save to bytes buffer
+        buffer = io.BytesIO()
+        img.save(buffer, format='PNG')
+        buffer.seek(0)
+        return buffer
+    @commands.command(name='showpalette', aliases=['palette', 'colors'])
+    async def show_palette(self, ctx):
+        """Display color palette by replying to an artwork message"""
+        try:
+            # Check if it's a reply
+            if not ctx.message.reference:
+                return await ctx.send("❌ Please reply to an artwork message to show its palette")
+        
+            # Get the referenced message
+            ref_msg = await ctx.channel.fetch_message(ctx.message.reference.message_id)
+        
+            # Extract artwork ID from embed (assuming your embeds include it)
+            artwork_id = None
+            for embed in ref_msg.embeds:
+                if embed.footer and embed.footer.text:
+                    # Try extracting ID from footer (e.g., "Artwork ID: 123")
+                    match = re.search(r"Artwork ID: (\d+)", embed.footer.text)
+                    if match:
+                        artwork_id = int(match.group(1))
+                        break
+        
+            if not artwork_id:
+                return await ctx.send("❌ Couldn't find artwork ID in the replied message")
+        
+            # Get palette from database
+            palette = await self.db.get_artwork_palette(artwork_id)
+            if not palette:
+                return await ctx.send("❌ No palette found for this artwork!")
+        
+            # Generate and send palette
+            hex_colors = [color['hex_code'] for color in sorted(palette, key=lambda x: x['dominance_rank'])]
+            image_buffer = self.generate_palette_image(hex_colors)
+        
+            embed = discord.Embed(
+                title=f"🎨 Color Palette for Artwork #{artwork_id}",
+                color=int(hex_colors[0].lstrip('#'), 16)
+            )
+        
+            file = discord.File(image_buffer, filename="palette.png")
+            embed.set_image(url="attachment://palette.png")
+        
+            for i, hex_code in enumerate(hex_colors, 1):
+                embed.add_field(
+                    name=f"Color {i}",
+                    value=f"`{hex_code}`\nDominance: {palette[i-1]['coverage']}%",
+                    inline=True
+                )
+        
+            await ctx.send(file=file, embed=embed)
+        
+        except Exception as e:
+            await ctx.send(f"❌ Error generating palette: {str(e)}")
     @commands.command(name='display')
     async def artworks(self, ctx, artist_name: str, page: int = 1):
         """View submitted artworks by an artist
@@ -164,7 +243,7 @@ class MoodyBot(commands.Cog):
             per_page = 5
             offset = (page - 1) * per_page
 
-        # Get or create artist
+            # Get or create artist
             artist = await self.db.get_or_create_artist(
                 artist_name=artist_name,
                 social_media_link=""  # Provide empty if not needed

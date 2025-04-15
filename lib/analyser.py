@@ -1,6 +1,5 @@
 from colorthief import ColorThief
 from io import BytesIO
-import io
 import aiohttp
 import logging
 from typing import List, Dict
