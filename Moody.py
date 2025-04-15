@@ -109,10 +109,6 @@ class MoodyBot(commands.Cog):
             name=ctx.author.display_name
         )
         # 2. Then create artist with proper key names
-            artist_data = {
-            'artist_name': metadata['name'],
-            'social_media_link': metadata['social'] or ""  # Map to correct key
-        }
             artist = await self.db.get_or_create_artist(artist_name=metadata['name'], social_media_link=metadata['social'])
 
         # 3. Then create artwork
@@ -145,6 +141,7 @@ class MoodyBot(commands.Cog):
         )
             embed.add_field(name="Tags", value=", ".join(metadata['tags']) if metadata['tags'] else "None")
             embed.set_image(url=image_url)
+            embed.set_footer(text=f'Artwork ID: {artwork}')
             await ctx.send(embed=embed)
 
             await ctx.send("✅ Artwork submitted successfully!")
