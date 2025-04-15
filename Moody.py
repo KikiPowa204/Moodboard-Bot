@@ -215,7 +215,7 @@ class MoodyBot(commands.Cog):
         """Generate a stylish moodboard image"""
         img = Image.new('RGB', (width, height))
         draw = ImageDraw.Draw(img)
-    
+        print ("in generate_moodboard")
         # Create gradient blocks
         block_width = width // len(colors)
         for i, hex_color in enumerate(colors):
