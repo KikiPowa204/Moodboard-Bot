@@ -5,6 +5,7 @@ from PIL import ImageDraw, Image
 import logging
 import re
 import os
+import math
 import asyncio
 from typing import Optional
 from mysql.connector import Error    # Moody.py
@@ -17,6 +18,13 @@ import random
 import discord
 import logging
 import aiohttp
+import traceback
+from colormath.color_objects import LabColor, sRGBColor
+from colormath.color_conversions import convert_color
+from colormath.color_diff import delta_e_cie2000
+import numpy as np
+import matplotlib.pyplot as plt
+
 
 pending_submissions = {}  # Format: {prompt_message_id: original_message_data}
 intents = discord.Intents.default()
@@ -162,90 +170,157 @@ class MoodyBot(commands.Cog):
         except Exception as e:
             self.logger.error(f"Submission error: {e}", exc_info=True)
             await ctx.send(f"⚠️ Submission failed: {str(e)}")
-    
     @commands.command(name='trend')
     async def show_theme_trends(self, ctx, *, theme: str):
-        """Show color trends for a theme - DEBUGGED VERSION"""
+        """Show artworks matching theme with color relationship analysis"""
         try:
-            # 1. Get raw palette data
-            theme_palettes = await self.db.get_theme_palettes(theme.lower())
-            print(f"Raw palette data: {theme_palettes}")  # DEBUG
-            
-            if not theme_palettes:
-                return await ctx.send(f"❌ No data found for '{theme}' theme")
+            # 1. Get all artworks with the theme tag
+            theme_artworks = await self.db.get_artworks_by_tag(theme.lower())
+            if not theme_artworks:
+                return await ctx.send(f"❌ No artworks found with '{theme}' tag")
 
-            # 2. Process colors - NEW SAFE VERSION
-            color_stats = {}
-            for palette in theme_palettes:
-                # First check if palette is a dict with 'colors' key
-                if not isinstance(palette, dict):
-                    print(f"Skipping invalid palette (not dict): {palette}")  # DEBUG
+            # 2. Convert all artwork colors to Lab color space for better comparison
+            artwork_color_data = []
+            for artwork in theme_artworks:
+                palette = await self.db.get_artwork_palette(artwork['id'])
+                if not palette:
                     continue
-                    
-                # Get colors list - handle different possible structures
-                colors = palette.get('colors', []) if 'colors' in palette else palette
                 
-                # Ensure we have a list
-                if not isinstance(colors, list):
-                    colors = [colors]
-                
-                # Process each color
-                for color in colors:
+                # Convert all colors to Lab space
+                lab_colors = []
+                for color in palette:
                     try:
-                        if not isinstance(color, dict):
-                            print(f"Skipping invalid color (not dict): {color}")  # DEBUG
-                            continue
-                            
-                        # Get dominance rank - handle different field names
-                        rank = color.get('dominance_rank', color.get('rank', 999))
-                        
-                        # Only count dominant colors (rank 1)
-                        if int(rank) == 1:
-                            hex_code = color.get('hex_code', color.get('hex', '#000000'))
-                            color_stats[hex_code] = color_stats.get(hex_code, 0) + 1
+                        rgb = sRGBColor.new_from_rgb_hex(color['hex_code'])
+                        lab = convert_color(rgb, LabColor)
+                        lab_colors.append({
+                            'lab': lab,
+                            'original_hex': color['hex_code'],
+                            'dominance': color['dominance_rank']
+                        })
                     except Exception as e:
-                        print(f"Error processing color: {color} - {e}")  # DEBUG
                         continue
+                
+                if lab_colors:
+                    artwork_color_data.append({
+                        'artwork': artwork,
+                        'colors': lab_colors
+                    })
 
-            print(f"Color stats: {color_stats}")  # DEBUG
-            
-            if not color_stats:
-                return await ctx.send(f"❌ No dominant colors found for '{theme}'")
+            if not artwork_color_data:
+                return await ctx.send(f"❌ No valid color data found for '{theme}' artworks")
 
-            # 3. Get top colors
-            top_colors = sorted(color_stats.items(), key=lambda x: x[1], reverse=True)[:5]
-            hex_colors = [color[0] for color in top_colors]
-            print(f"Top colors: {hex_colors}")  # DEBUG
+            # 3. Find the most representative color cluster
+            all_lab_colors = [c['lab'] for ad in artwork_color_data for c in ad['colors']]
+            if not all_lab_colors:
+                return await ctx.send("❌ No colors available for analysis")
 
-            # Rest of your image generation and embed code...
-            
+            # Use the most dominant color as our reference point
+            reference_color = max(
+                (c for ad in artwork_color_data for c in ad['colors']),
+                key=lambda x: x['dominance']
+            )['lab']
 
-            # 4. Generate moodboard image
-            print (hex_colors)
-            moodboard = self.generate_moodboard(hex_colors)
-        
-            # 5. Create embed
+            # 4. Score artworks by color similarity to reference
+            scored_artworks = []
+            for artwork in artwork_color_data:
+                score = 0
+                best_matches = []
+                
+                for color in artwork['colors']:
+                    # Calculate color difference (lower is more similar)
+                    delta_e = delta_e_cie2000(reference_color, color['lab'])
+                    
+                    # Convert to similarity score (0-100, higher is better)
+                    similarity = max(0, 100 - delta_e)
+                    
+                    # Weight by color dominance
+                    weighted_score = similarity * (1/color['dominance'])
+                    score += weighted_score
+                    best_matches.append({
+                        'hex': color['original_hex'],
+                        'similarity': similarity,
+                        'delta_e': delta_e
+                    })
+                
+                scored_artworks.append({
+                    'artwork': artwork['artwork'],
+                    'score': score,
+                    'best_matches': sorted(best_matches, key=lambda x: x['delta_e'])[:3]  # Top 3 closest colors
+                })
+
+            # 5. Sort by best matches
+            scored_artworks.sort(key=lambda x: x['score'], reverse=True)
+            top_artworks = scored_artworks[:5]  # Get top 5 matches
+
+            # 6. Generate moodboard
+            collage = await self._generate_color_relationship_moodboard(top_artworks)
+            file = discord.File(collage, filename="color_trend.png")
+
+            # 7. Create embed with analysis
             embed = discord.Embed(
-                title=f"🎨 Color Trends for '{theme.title()}'",
-                description=f"Based on {len(theme_palettes)} artworks",
-                color=int(hex_colors[0].lstrip('#'), 16)
+                title=f"🎨 Color Trends for '{theme}'",
+                description=f"Based on perceptual color relationships",
+                color=int(reference_color.get_rgb_hex(), 16)
             )
-        
-            file = discord.File(moodboard, filename="moodboard.png")
-            embed.set_image(url="attachment://moodboard.png")
-        
-            for i, (hex_code, count) in enumerate(top_colors, 1):
-                percentage = (count / len(theme_palettes)) * 100
+            
+            # Add color info
+            embed.add_field(
+                name="Reference Color",
+                value=f"`{reference_color.get_rgb_hex()}` (Most Dominant)",
+                inline=False
+            )
+            
+            # Add top matches
+            for i, artwork in enumerate(top_artworks, 1):
+                best_color = artwork['best_matches'][0]
                 embed.add_field(
-                    name=f"#{i} {hex_code}",
-                    value=f"Appears in {percentage:.1f}% of artworks",
-                    inline=True
+                    name=f"#{i} {artwork['artwork']['title']}",
+                    value=f"Closest: `{best_color['hex']}` (ΔE: {best_color['delta_e']:.1f})",
+                    inline=False
+                )
+            
+            embed.set_image(url="attachment://color_trend.png")
+            await ctx.send(file=file, embed=embed)
+
+        except Exception as e:
+            await ctx.send(f"❌ Error: {str(e)}")
+            self.logger.error(f"Trend error: {traceback.format_exc()}")
+
+    async def _generate_color_relationship_moodboard(self, artworks):
+        """Generate moodboard showing color relationships"""
+        # Create color relationship visualization
+        fig, ax = plt.subplots(figsize=(10, 6))
+        
+        # Plot reference color and matches
+        for artwork in artworks:
+            for match in artwork['best_matches']:
+                color = match['hex']
+                delta_e = match['delta_e']
+                
+                # Convert to RGB for display
+                rgb = tuple(int(color.lstrip('#')[i:i+2], 16) for i in (0, 2, 4))
+                rgb = tuple(c/255 for c in rgb)
+                
+                # Plot with size based on similarity
+                size = max(1, 100 - delta_e) * 10
+                ax.scatter(
+                    delta_e, 
+                    artwork['score'], 
+                    c=[rgb],
+                    s=size,
+                    alpha=0.7
                 )
         
-            await ctx.send(file=file, embed=embed)
+        ax.set_xlabel('Color Difference (ΔE)')
+        ax.set_ylabel('Match Score')
+        ax.set_title('Color Relationship Analysis')
         
-        except Exception as e:
-            await ctx.send(f"❌ Error generating trends: {str(e)}")
+        # Save to buffer
+        buffer = io.BytesIO()
+        plt.savefig(buffer, format='png', bbox_inches='tight')
+        plt.close()
+        buffer.seek(0)
+        return buffer
             
     def generate_moodboard(self, colors: list, width=600, height=300) -> io.BytesIO:
         """Generate a stylish moodboard image"""

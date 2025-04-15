@@ -322,6 +322,22 @@ class MySQLStorage:
             async with conn.cursor() as cursor:
                 await cursor.executemany(query, palette_data)
                 await conn.commit()
+    async def get_artworks_by_tag(self, tag: str):
+        """Get artworks with specific tag including their palettes"""
+        async with self.pool.acquire() as conn:
+            async with conn.cursor(aiomysql.DictCursor) as cursor:
+                await cursor.execute("""
+                    SELECT a.*, 
+                        GROUP_CONCAT(at.tag) as tags,
+                        (SELECT GROUP_CONCAT(CONCAT_WS('|', cp.hex_code, cp.dominance_rank))
+                        FROM color_palettes cp 
+                        WHERE cp.artwork_id = a.id) as palette
+                    FROM artworks a
+                    JOIN artwork_tags at ON a.id = at.artwork_id
+                    WHERE at.tag LIKE %s
+                    GROUP BY a.id
+                """, (f"%{tag}%",))
+                return await cursor.fetchall()
     async def get_artwork_tags(self, artwork_id: int) -> List[str]:
         """Get all tags for a specific artwork"""
         async with self.pool.acquire() as conn:
