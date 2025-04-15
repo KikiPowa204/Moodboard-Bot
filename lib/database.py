@@ -325,6 +325,7 @@ class MySQLStorage:
                 await conn.commit()
     async def get_artwork_palette(self, artwork_id: int):
         """Get palette with nuclear-grade type validation"""
+        print (f'In get_artwork_palette. Artwork_ID: {artwork_id}')
         query = '''
             SELECT hex_code, dominance_rank, coverage
             FROM color_palettes

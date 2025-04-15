@@ -198,7 +198,7 @@ class MoodyBot(commands.Cog):
         
             if not artwork_id:
                 return await ctx.send("❌ Couldn't find artwork ID in the replied message")
-        
+            print (f'in show_palette. Artwork_ID: {artwork_id}')
             # Get palette from database
             palette = await self.db.get_artwork_palette(artwork_id)
             if not palette:
