@@ -24,8 +24,8 @@ from colormath.color_conversions import convert_color
 from _delta_e import delta_e_cie2000
 import numpy as np
 import matplotlib.pyplot as plt
-import sklearn
-
+from collections import Counter
+from sklearn.cluster import KMeans
 
 pending_submissions = {}  # Format: {prompt_message_id: original_message_data}
 intents = discord.Intents.default()
@@ -382,8 +382,6 @@ class MoodyBot(commands.Cog):
 
     async def _cluster_artwork_colors(self, artworks, n_clusters=5):
         """Cluster colors from all artworks to find common patterns"""
-        from sklearn.cluster import KMeans
-        import numpy as np
         
         # 1. Collect all dominant colors
         all_colors = []
