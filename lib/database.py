@@ -2,7 +2,7 @@ import aiomysql
 import os
 import logging
 from urllib.parse import urlparse
-from typing import Optional, Dict, List, Union, Any
+from typing import Any, Optional, Dict, List, Union
 from mysql.connector import connect, Error  # Import MySQL connector
 import asyncio
 import os
