@@ -473,60 +473,93 @@ class MoodyBot(commands.Cog):
 
     @commands.command(name='art')
     async def fetch_artwork(self, ctx, *, tag: str):
-        """Display artworks matching the given tag"""
+        """Display artworks matching the given tag (supports partial matching)"""
         try:
-            per_page = 5
-            page = 1  # Default page (could make this a parameter later)
-            
             # Clean the tag input
             tag = tag.strip().lower()
             if not tag:
                 return await ctx.send("Please provide a valid tag.")
 
-            # Get artworks by single tag
-            artworks = await self.db.get_artworks_by_tag(
-                tag=tag,
-                limit=per_page,
-                offset=(page - 1) * per_page
-            )
+            # Get artworks with this tag (using the LIKE operator for partial matches)
+            artworks = await self.db.get_artworks_by_tag(tag)
 
             if not artworks:
-                return await ctx.send(f"No artworks found with tag: {tag}")
+                return await ctx.send(f"No artworks found with tag matching: {tag}")
 
-            for art in artworks:
-                # Get artist info
-                artist = await self.db.get_artist_by_id(art['artist_id'])
-                
-                # Get all tags for this artwork
-                artwork_tags = await self.db.get_artwork_tags(art['id'])
-                
-                # Create embed
+            # Client-side pagination
+            per_page = 3  # Number of artworks to show per message
+            pages = [artworks[i:i + per_page] for i in range(0, len(artworks), per_page)]
+            current_page = 0
+
+            def create_embed(page_num):
                 embed = discord.Embed(
-                    title=art.get('title', 'Untitled'),
-                    description=art.get('description', 'No description')[:200] + 
-                        ('...' if len(art.get('description', '')) > 200 else ''),
-                    color=0x6E85B2,
-                    timestamp=art['created_at']
+                    title=f"Artworks matching: {tag}",
+                    description=f"Page {page_num + 1}/{len(pages)}",
+                    color=0x6E85B2
                 )
-                embed.set_image(url=art['image_url'])
                 
-                # Add artist field
-                if artist:
-                    embed.set_author(
-                        name=artist['artist_name'],
-                        url=artist.get('social_media_link', '')
-                    )
-                
-                # Add all tags
-                if artwork_tags:
+                for art in pages[page_num]:
+                    # Parse the concatenated tags
+                    all_tags = art.get('tags', '').split(',') if art.get('tags') else []
+                    
+                    # Parse the color palette
+                    palette = []
+                    if art.get('palette'):
+                        palette = [color.split('|') for color in art['palette'].split(',')]
+                        palette.sort(key=lambda x: int(x[1]))  # Sort by dominance_rank
+                    
+                    # Add artwork fields
+                    value = f"**Artist:** {art.get('artist_name', 'Unknown')}\n"
+                    if all_tags:
+                        value += f"**Tags:** {', '.join(all_tags)}\n"
+                    if palette:
+                        color_blocks = ' '.join([f"`{c[0]}`" for c in palette[:5]])
+                        value += f"**Colors:** {color_blocks}"
+                    
                     embed.add_field(
-                        name="Tags",
-                        value=", ".join(artwork_tags),
+                        name=art.get('title', 'Untitled'),
+                        value=value,
                         inline=False
                     )
+                    
+                    # Use first artwork's image as embed thumbnail
+                    if art.get('image_url') and not embed.thumbnail:
+                        embed.set_thumbnail(url=art['image_url'])
                 
-                embed.set_footer(text=f"Artwork ID: {art['id']} • {art['created_at'].strftime('%b %d, %Y')}")
-                await ctx.send(embed=embed)
+                embed.set_footer(text=f"Found {len(artworks)} artworks • Use reactions to navigate")
+                return embed
+
+            message = await ctx.send(embed=create_embed(current_page))
+            
+            # Add pagination controls if multiple pages exist
+            if len(pages) > 1:
+                await message.add_reaction("⬅️")
+                await message.add_reaction("➡️")
+                
+                def check(reaction, user):
+                    return (user == ctx.author and 
+                            reaction.message.id == message.id and 
+                            str(reaction.emoji) in ["⬅️", "➡️"])
+                
+                while True:
+                    try:
+                        reaction, user = await self.bot.wait_for(
+                            "reaction_add", 
+                            timeout=60.0, 
+                            check=check
+                        )
+                        
+                        if str(reaction.emoji) == "➡️" and current_page < len(pages) - 1:
+                            current_page += 1
+                        elif str(reaction.emoji) == "⬅️" and current_page > 0:
+                            current_page -= 1
+                        
+                        await message.edit(embed=create_embed(current_page))
+                        await message.remove_reaction(reaction, user)
+                        
+                    except asyncio.TimeoutError:
+                        await message.clear_reactions()
+                        break
 
         except Exception as e:
             await ctx.send(f"🚨 Error fetching artworks: {str(e)}")
