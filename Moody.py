@@ -424,13 +424,31 @@ class MoodyBot(commands.Cog):
         """Check if a color belongs to a cluster within threshold ΔE"""
         color_lab = self._hex_to_lab(hex_color)
         cluster_center = cluster['center']
-        delta_e = self._delta_e_cie2000(color_lab, cluster_center)
+        delta_e = delta_e_cie2000(color_lab, cluster_center)
         return delta_e < threshold
 
-    def _hex_to_lab(self, hex_color):
-        """Convert hex color to LAB space (simplified version)"""
-        rgb = tuple(int(hex_color.lstrip('#')[i:i+2], 16) for i in (0, 2, 4))
-        return delta_e_cie2000(rgb)
+    def _hex_to_lab(self, hex_color, reference_color):
+        """Convert hex color to LAB and calculate Delta-E with reference color"""
+        try:
+            # Convert hex color to RGB
+            rgb = tuple(int(hex_color.lstrip('#')[i:i+2], 16) for i in (0, 2, 4))
+            
+            # Convert RGB to LAB
+            color_rgb = sRGBColor.new_from_rgb_triplet(*rgb)
+            color_lab = convert_color(color_rgb, LabColor)
+
+            # Get the LAB values for reference color (dominant color)
+            lab1 = (reference_color.lab_l, reference_color.lab_a, reference_color.lab_b)
+            lab2 = (color_lab.lab_l, color_lab.lab_a, color_lab.lab_b)
+            
+            # Calculate the Delta-E between the reference color and the target color
+            delta_e = delta_e_cie2000(lab1, lab2)
+
+            return delta_e
+        except Exception as e:
+            self.logger.warning(f"Color conversion or Delta-E calculation failed: {e}")
+            return None
+
 
     async def _generate_overlap_comparison(self, artworks, clusters):
         """Generate visual comparison of palette overlaps"""
