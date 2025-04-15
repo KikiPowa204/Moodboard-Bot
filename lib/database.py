@@ -175,7 +175,21 @@ class MySQLStorage:
                     return False
                 finally:
                     await cursor.execute("SET sql_notes = 1;")
-
+    async def get_random_artworks(self, limit: int = 5):
+        """Get completely random artworks"""
+        async with self.pool.acquire() as conn:
+            async with conn.cursor(aiomysql.DictCursor) as cursor:
+                await cursor.execute("""
+                    SELECT a.*, ar.artist_name, ar.social_media_link, 
+                        GROUP_CONCAT(at.tag) as tags
+                    FROM artworks a
+                    JOIN artists ar ON a.artist_id = ar.id
+                    JOIN artwork_tags at ON a.id = at.artwork_id
+                    GROUP BY a.id
+                    ORDER BY RAND()
+                    LIMIT %s
+                """, (limit,))
+                return await cursor.fetchall()
     async def get_artworks_with_artist_info(self, tag: str):
         """Get artworks with joined artist information"""
         async with self.pool.acquire() as conn:
