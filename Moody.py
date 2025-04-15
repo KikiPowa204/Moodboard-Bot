@@ -487,9 +487,7 @@ class MoodyBot(commands.Cog):
 
             # Get artworks matching ALL tags (for OR matching, you'd need to modify the query)
             artworks = await self.db.get_artworks_by_tag(
-                tag=tag_list,
-                match_all=True  # Assuming your method can handle this
-            )
+                tag=tag_list)
 
             if not artworks:
                 return await ctx.send(f"No artworks found matching all tags: {', '.join(tag_list)}")
