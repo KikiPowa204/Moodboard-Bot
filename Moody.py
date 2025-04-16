@@ -509,7 +509,7 @@ class MoodyBot(commands.Cog):
                         value=", ".join(art['tags'].split(',')[:10]),  # Show first 10 tags
                         inline=False
                     )
-                
+                embed.set_footer(text=f'Artwork ID: {art["id"]}')
                 await ctx.send(embed=embed)
 
         except Exception as e:
