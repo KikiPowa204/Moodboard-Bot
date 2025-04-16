@@ -1,0 +1,93 @@
+# Moodboard Bot
+
+This project is a Discord bot designed to analyze and manage moodboard images. It provides tools for submitting artwork, analyzing color palettes, and exploring trends and overlaps in artwork themes.
+
+## Features
+- **Submit Artwork**: Submit artwork with metadata (artist name, title, description, tags).
+- **Retrieve Artwork**: Fetch artwork by artist, theme, or randomly.
+- **Analyze Colors**: Extract dominant colors and generate palettes.
+- **Trend Analysis**: Identify consistent color trends in themes.
+- **Overlap Analysis**: Find overlapping color palettes across artworks.
+- **Generate Moodboards**: Create visual moodboards based on dominant colors.
+
+## Commands
+### Submission
+- `!submit`  
+  Submit artwork with metadata. Attach an image and include the following format:
+  ```
+  !submit
+  Name: (artist name)
+  Social: (artstation link)
+  Title: (artwork title)
+  Desc: (art description)
+  Tags: (comma-separated tags)
+  ```
+
+### Retrieval
+- `!artist <artist name>`  
+  Retrieve all artworks by a specific artist.
+- `!art <theme>`  
+  Fetch artworks matching a specific theme or tag.
+- `!art random`  
+  Retrieve random artworks.
+
+### Analysis
+- `!palette`  
+  Display the color palette of a specific artwork by replying to its message.
+- `!trend <theme>`  
+  Analyze and display color trends for a specific theme.
+- `!overlap <theme>`  
+  Show artworks with overlapping color palettes for a specific theme.
+
+## Setup
+### Requirements
+- Python 3.13 or higher
+- Refer to `requirements.txt` for required libraries.
+
+### Environment Variables
+Set the following environment variables:
+- `DISCORD_TOKEN`: Your Discord bot token.
+- `MYSQL_PUBLIC_URL`: MySQL database connection URL.
+
+### Installation
+1. Clone the repository:
+   ```bash
+   git clone <repository-url>
+   cd Moodboard-Bot
+   ```
+2. Install dependencies:
+   ```bash
+   pip install -r requirements.txt
+   ```
+3. Run the bot:
+   ```bash
+   python Moody.py
+   ```
+
+## Files Overview
+### 1. `Moody.py`
+The main script that initializes the bot and handles Discord commands.
+
+### 2. `lib/database.py`
+Manages database operations, including storing and retrieving artwork, artists, and color palettes.
+
+### 3. `lib/analyser.py`
+Handles image analysis, extracting dominant colors and generating palettes.
+
+### 4. `_delta_e.py`
+Implements color difference calculations using the Delta E formula for accurate color comparisons.
+
+## Future Plans
+- Add support for filtering results by mood or color palette in the `!art` command.
+- Introduce a feature to tag AI-generated art and exclude it from the database.
+- Enhance trend and overlap visualizations with more detailed metrics.
+- Allow users to specify additional parameters for commands (e.g., `!art mood=?`).
+
+## License
+This project is licensed under the MIT License. See the LICENSE file for details.
+
+## Contributing
+Contributions are welcome! Please fork the repository and submit a pull request with your changes.
+
+## Contact
+For any questions or issues, please contact the project maintainer.
