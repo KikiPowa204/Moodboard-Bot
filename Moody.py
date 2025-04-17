@@ -358,7 +358,7 @@ class MoodyBot(commands.Cog):
         return buffer
 
     async def _download_image(self, url, size=None, artwork_id=None):
-        """Download and optionally resize image, with fallback to CDN URL."""
+        """Download and optionally resize image, with fallback to Discord proxy."""
         try:
             # If the URL is invalid or missing, fetch the CDN URL from the database
             if not url and artwork_id:
@@ -368,7 +368,7 @@ class MoodyBot(commands.Cog):
             if not url or not url.startswith("http"):
                 raise ValueError(f"Invalid URL: {url}")
 
-            # Download the image
+            # Attempt to fetch the image
             async with aiohttp.ClientSession() as session:
                 async with session.get(url) as response:
                     if response.status != 200:
@@ -380,6 +380,7 @@ class MoodyBot(commands.Cog):
             if size:
                 img.thumbnail(size)
             return img
+
         except Exception as e:
             self.logger.error(f"Image download failed: {e}")
             raise
