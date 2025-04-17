@@ -492,17 +492,17 @@ class MoodyBot(commands.Cog):
         proxied_urls = []
         for i, artwork in enumerate(artworks, 1):
             embed = discord.Embed(
-                title=f"Top #{i}: {artwork.get('title', 'Untitled')}",
-                description=f"Score: {artwork.get('score', 'N/A')}",
+                title=f"Top #{i}: {artwork['artwork'].get('title', 'Untitled')}",
+                description=f"Score: {artwork['score']}",
                 color=0x6E85B2
             )
-            embed.set_image(url=artwork['image_url'])
+            embed.set_image(url=artwork['artwork']['image_url'])
             embed.add_field(
                 name="Matched Colors",
                 value=", ".join(artwork.get('matched_colors', [])),
                 inline=False
             )
-            embed.set_footer(text=f"Artwork ID: {artwork['id']}")
+            embed.set_footer(text=f"Artwork ID: {artwork['artwork']['id']}")
             message = await ctx.send(embed=embed)
 
             # Extract proxied URL from the embed
@@ -598,7 +598,7 @@ class MoodyBot(commands.Cog):
                 return await ctx.send("❌ No artworks matched the color clusters")
 
             # Get proxied URLs for top artworks and embed them
-            proxied_urls = await self._get_proxied_urls(ctx, [artwork['artwork'] for artwork in top_artworks])
+            proxied_urls = await self._get_proxied_urls(ctx, top_artworks)
 
             # Update the top_artworks with proxied URLs
             for i, proxied_url in enumerate(proxied_urls):
