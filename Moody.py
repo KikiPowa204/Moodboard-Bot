@@ -365,6 +365,8 @@ class MoodyBot(commands.Cog):
                 url = await self.db.get_cdn_url(artwork_id)
                 if not url:
                     raise ValueError(f"No valid URL found for artwork ID {artwork_id}")
+            if not url or not url.startswith("http"):
+                raise ValueError(f"Invalid URL: {url}")
 
             # Download the image
             async with aiohttp.ClientSession() as session:
