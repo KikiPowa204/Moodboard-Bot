@@ -326,7 +326,7 @@ class MoodyBot(commands.Cog):
         
         # Plot artworks
         for i, artwork in enumerate(artworks[:5]):
-            img = await self._download_image(artwork['artwork']['image_url'], (200, 200))
+            img = await self._download_image(artwork['artwork']['image_url'], size=(200, 200), artwork_id=artwork['artwork']['id'])
             ax.imshow(
                 img,
                 extent=(i-0.4, i+0.4, 0, 0.8),
@@ -357,18 +357,29 @@ class MoodyBot(commands.Cog):
         buffer.seek(0)
         return buffer
 
-    async def _download_image(self, url, size=None):
-        """Download and optionally resize image"""
+    async def _download_image(self, url, size=None, artwork_id=None):
+        """Download and optionally resize image, with fallback to CDN URL."""
         try:
+            # If the URL is invalid or missing, fetch the CDN URL from the database
+            if not url and artwork_id:
+                url = await self.db.get_cdn_url(artwork_id)
+                if not url:
+                    raise ValueError(f"No valid URL found for artwork ID {artwork_id}")
+
+            # Download the image
             async with aiohttp.ClientSession() as session:
                 async with session.get(url) as response:
+                    if response.status != 200:
+                        raise ValueError(f"Failed to fetch image from URL: {url}")
                     img_data = await response.read()
-        
+
+            # Open and optionally resize the image
             img = Image.open(io.BytesIO(img_data))
             if size:
                 img.thumbnail(size)
             return img
         except Exception as e:
+            self.logger.error(f"Image download failed: {e}")
             raise
     def _hex_to_lab(self, hex_color):
         """Convert hex color to LAB color space"""

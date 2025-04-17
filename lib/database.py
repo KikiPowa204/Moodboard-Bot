@@ -355,6 +355,18 @@ class MySQLStorage:
             async with conn.cursor() as cursor:
                 await cursor.executemany(query, palette_data)
                 await conn.commit()
+    async def get_cdn_url(self, artwork_id: int) -> Optional[str]:
+        """Fetch the CDN URL for a specific artwork."""
+        query = """
+            SELECT image_url
+            FROM artworks
+            WHERE id = %s
+        """
+        async with self.pool.acquire() as conn:
+            async with conn.cursor(aiomysql.DictCursor) as cursor:
+                await cursor.execute(query, (artwork_id,))
+                result = await cursor.fetchone()
+                return result['image_url'] if result else None
     async def get_artworks_by_tag(self, tag: str):
         """Get artworks with specific tag including their palettes"""
         async with self.pool.acquire() as conn:
