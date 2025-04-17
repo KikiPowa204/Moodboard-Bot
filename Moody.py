@@ -488,14 +488,21 @@ class MoodyBot(commands.Cog):
             self.logger.error(f"Cluster check failed: {e}")
             return False
     async def _get_proxied_urls(self, ctx, artworks):
-        """Send embeds to get proxied URLs for top-ranked artwork images."""
+        """Send embeds for ranked artwork images and retrieve proxied URLs."""
         proxied_urls = []
-        for artwork in artworks:
+        for i, artwork in enumerate(artworks, 1):
             embed = discord.Embed(
-                title=artwork.get('title', 'Untitled'),
+                title=f"Top #{i}: {artwork.get('title', 'Untitled')}",
+                description=f"Score: {artwork.get('score', 'N/A')}",
                 color=0x6E85B2
             )
             embed.set_image(url=artwork['image_url'])
+            embed.add_field(
+                name="Matched Colors",
+                value=", ".join(artwork.get('matched_colors', [])),
+                inline=False
+            )
+            embed.set_footer(text=f"Artwork ID: {artwork['id']}")
             message = await ctx.send(embed=embed)
 
             # Extract proxied URL from the embed
@@ -590,28 +597,12 @@ class MoodyBot(commands.Cog):
             if not top_artworks:
                 return await ctx.send("❌ No artworks matched the color clusters")
 
-            # Get proxied URLs for top artworks only
+            # Get proxied URLs for top artworks and embed them
             proxied_urls = await self._get_proxied_urls(ctx, [artwork['artwork'] for artwork in top_artworks])
 
             # Update the top_artworks with proxied URLs
             for i, proxied_url in enumerate(proxied_urls):
                 top_artworks[i]['proxied_url'] = proxied_url
-
-            # Generate embeds for top artworks
-            for i, top_artwork in enumerate(top_artworks, 1):
-                embed = discord.Embed(
-                    title=f"Top #{i}: {top_artwork['artwork'].get('title', 'Untitled')}",
-                    description=f"Score: {top_artwork['score']}",
-                    color=0x6E85B2
-                )
-                embed.set_image(url=top_artwork['proxied_url'])
-                embed.add_field(
-                    name="Matched Colors",
-                    value=", ".join(top_artwork['matched_colors']),
-                    inline=False
-                )
-                embed.set_footer(text=f"Artwork ID: {top_artwork['artwork']['id']}")
-                await ctx.send(embed=embed)
 
             # Generate and send visualization
             image_buffer = await self._generate_overlap_visualization(top_artworks, color_clusters)
