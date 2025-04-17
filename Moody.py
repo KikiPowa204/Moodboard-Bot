@@ -310,11 +310,11 @@ class MoodyBot(commands.Cog):
         
         await ctx.send(file=discord.File(buffer, "trend.png"), embed=embed)
     async def _generate_overlap_visualization(self, artworks, clusters):
-        """Generate color overlap visualization"""
+        """Generate color overlap visualization."""
         from matplotlib import pyplot as plt
-        
+
         fig, ax = plt.subplots(figsize=(12, 8))
-        
+
         # Plot clusters
         for i, cluster in enumerate(clusters[:5]):
             ax.scatter(
@@ -323,16 +323,16 @@ class MoodyBot(commands.Cog):
                 s=500,
                 label=f"Group {i+1}"
             )
-        
+
         # Plot artworks
         for i, artwork in enumerate(artworks[:5]):
-            img = await self._download_image(artwork['artwork']['image_url'], size=(200, 200), artwork_id=artwork['artwork']['id'])
+            img = await self._download_image(artwork['proxied_url'], size=(200, 200))
             ax.imshow(
                 img,
                 extent=(i-0.4, i+0.4, 0, 0.8),
                 zorder=0
             )
-            
+
             # Draw connection lines
             for color in artwork['matched_colors'][:3]:
                 for j, cluster in enumerate(clusters[:5]):
@@ -345,12 +345,12 @@ class MoodyBot(commands.Cog):
                             linewidth=2
                         )
                         break
-        
+
         ax.set_xlim(-0.5, max(4.5, len(artworks)-0.5))
         ax.set_ylim(-0.1, 1.5)
         ax.axis('off')
         ax.legend(loc='upper center', ncol=5)
-        
+
         buffer = io.BytesIO()
         plt.savefig(buffer, format='png', bbox_inches='tight', dpi=120)
         plt.close()
@@ -487,6 +487,22 @@ class MoodyBot(commands.Cog):
         except Exception as e:
             self.logger.error(f"Cluster check failed: {e}")
             return False
+    async def _get_proxied_urls(self, ctx, artworks):
+        """Send embeds to get proxied URLs for artwork images."""
+        proxied_urls = []
+        for artwork in artworks:
+            embed = discord.Embed(
+                title=artwork.get('title', 'Untitled'),
+                color=0x6E85B2
+            )
+            embed.set_image(url=artwork['image_url'])
+            message = await ctx.send(embed=embed)
+
+            # Extract proxied URL from the embed
+            if message.embeds and message.embeds[0].image:
+                proxied_urls.append(message.embeds[0].image.url)
+
+        return proxied_urls
     @commands.command(name='art')
     async def fetch_artwork(self, ctx, *, tag: str = None):
         """Display random artworks (optionally matching a tag)"""
@@ -535,12 +551,15 @@ class MoodyBot(commands.Cog):
 
     @commands.command(name='overlap')
     async def show_palette_overlap(self, ctx, *, theme: str):
-        """Show artworks with consistent color palette overlaps"""
+        """Show artworks with consistent color palette overlaps."""
         try:
             # Get artworks with theme tag
             theme_artworks = await self.db.get_artworks_by_tag(theme.lower())
             if not theme_artworks:
                 return await ctx.send(f"❌ No artworks found with '{theme}' tag")
+
+            # Get proxied URLs for the artworks
+            proxied_urls = await self._get_proxied_urls(ctx, theme_artworks)
 
             # Cluster colors
             color_clusters = await self._cluster_artwork_colors(theme_artworks)
@@ -549,11 +568,11 @@ class MoodyBot(commands.Cog):
 
             # Score artworks by cluster matches
             scored_artworks = []
-            for artwork in theme_artworks:
+            for artwork, proxied_url in zip(theme_artworks, proxied_urls):
                 palette = await self.db.get_artwork_palette(artwork['id'])
                 if not palette:
                     continue
-                
+
                 matches = 0
                 matched_colors = []
                 for color in palette:
@@ -562,10 +581,11 @@ class MoodyBot(commands.Cog):
                             matches += 1
                             matched_colors.append(color['hex_code'])
                             break
-                
+
                 if matches > 0:
                     scored_artworks.append({
                         'artwork': artwork,
+                        'proxied_url': proxied_url,
                         'score': matches,
                         'matched_colors': matched_colors
                     })
@@ -585,7 +605,7 @@ class MoodyBot(commands.Cog):
                 color=0x6E85B2
             )
             embed.set_image(url="attachment://palette_overlap.png")
-            
+
             # Add cluster info
             for i, cluster in enumerate(color_clusters[:3], 1):
                 embed.add_field(
