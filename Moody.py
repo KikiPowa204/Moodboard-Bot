@@ -488,7 +488,7 @@ class MoodyBot(commands.Cog):
             self.logger.error(f"Cluster check failed: {e}")
             return False
     async def _get_proxied_urls(self, ctx, artworks):
-        """Send embeds to get proxied URLs for artwork images."""
+        """Send embeds to get proxied URLs for top-ranked artwork images."""
         proxied_urls = []
         for artwork in artworks:
             embed = discord.Embed(
@@ -548,7 +548,6 @@ class MoodyBot(commands.Cog):
         except Exception as e:
             await ctx.send(f"Error fetching artwork: {str(e)}")
             self.logger.error(f"Art fetch error: {e}", exc_info=True)
-
     @commands.command(name='overlap')
     async def show_palette_overlap(self, ctx, *, theme: str):
         """Show artworks with consistent color palette overlaps."""
@@ -558,9 +557,6 @@ class MoodyBot(commands.Cog):
             if not theme_artworks:
                 return await ctx.send(f"❌ No artworks found with '{theme}' tag")
 
-            # Get proxied URLs for the artworks
-            proxied_urls = await self._get_proxied_urls(ctx, theme_artworks)
-
             # Cluster colors
             color_clusters = await self._cluster_artwork_colors(theme_artworks)
             if not color_clusters:
@@ -568,7 +564,7 @@ class MoodyBot(commands.Cog):
 
             # Score artworks by cluster matches
             scored_artworks = []
-            for artwork, proxied_url in zip(theme_artworks, proxied_urls):
+            for artwork in theme_artworks:
                 palette = await self.db.get_artwork_palette(artwork['id'])
                 if not palette:
                     continue
@@ -585,7 +581,6 @@ class MoodyBot(commands.Cog):
                 if matches > 0:
                     scored_artworks.append({
                         'artwork': artwork,
-                        'proxied_url': proxied_url,
                         'score': matches,
                         'matched_colors': matched_colors
                     })
@@ -594,6 +589,13 @@ class MoodyBot(commands.Cog):
             top_artworks = sorted(scored_artworks, key=lambda x: x['score'], reverse=True)[:5]
             if not top_artworks:
                 return await ctx.send("❌ No artworks matched the color clusters")
+
+            # Get proxied URLs for top artworks only
+            proxied_urls = await self._get_proxied_urls(ctx, [artwork['artwork'] for artwork in top_artworks])
+
+            # Update the top_artworks with proxied URLs
+            for i, proxied_url in enumerate(proxied_urls):
+                top_artworks[i]['proxied_url'] = proxied_url
 
             # Generate embeds for top artworks
             for i, top_artwork in enumerate(top_artworks, 1):
