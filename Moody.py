@@ -359,14 +359,17 @@ class MoodyBot(commands.Cog):
 
     async def _download_image(self, url, size=None):
         """Download and optionally resize image"""
-        async with aiohttp.ClientSession() as session:
-            async with session.get(url) as response:
-                img_data = await response.read()
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url) as response:
+                    img_data = await response.read()
         
-        img = Image.open(io.BytesIO(img_data))
-        if size:
-            img.thumbnail(size)
-        return img
+            img = Image.open(io.BytesIO(img_data))
+            if size:
+                img.thumbnail(size)
+            return img
+        except Exception as e:
+            raise
     def _hex_to_lab(self, hex_color):
         """Convert hex color to LAB color space"""
         try:
